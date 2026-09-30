@@ -543,29 +543,3 @@ struct FansPage: View {
         }
     }
 }
-
-// MARK: Apps (becomes Processes in 1.4)
-
-struct AppsTable: View {
-    let apps: [AppUsage]
-    @State private var order = [KeyPathComparator(\AppUsage.memory, order: .reverse)]
-
-    var body: some View {
-        Table(apps.sorted(using: order), sortOrder: $order) {
-            TableColumn("App", value: \.name) { app in
-                HStack(spacing: 8) {
-                    if let icon = app.icon { Image(nsImage: icon).resizable().frame(width: 18, height: 18) }
-                    Text(app.name)
-                }
-            }
-            TableColumn("Memory", value: \.memory) { app in
-                Text(Fmt.memory(app.memory)).monospacedDigit()
-            }
-            .width(110)
-            TableColumn("% CPU", value: \.cpu) { app in
-                Text(app.cpu.formatted(.number.precision(.fractionLength(1)))).monospacedDigit()
-            }
-            .width(80)
-        }
-    }
-}
