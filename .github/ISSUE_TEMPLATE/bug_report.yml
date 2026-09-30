@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in Sonar is wrong or broken
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What did you see, and what did you expect instead? Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the panel
+        2. ...
+  - type: input
+    id: mac
+    attributes:
+      label: Mac and macOS
+      placeholder: MacBook Pro 14" M4 Pro, macOS 26.1
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Sonar version
+      description: Finder → Applications → Sonar → Get Info
+      placeholder: "1.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: snapshot
+    attributes:
+      label: Sensor snapshot (for temperature or fan issues)
+      description: Output of `/Applications/Sonar.app/Contents/MacOS/Sonar --snapshot ~/Desktop/sonar.png`
+      render: text

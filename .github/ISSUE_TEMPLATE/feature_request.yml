@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest something Sonar should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The problem or need, not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like Sonar to do?
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything else you've tried?

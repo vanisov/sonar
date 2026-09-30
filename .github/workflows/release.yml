@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build
+        run: DEVELOPER_DIR="$(xcode-select -p)" VERSION="${GITHUB_REF_NAME#v}" ./bundle.sh
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v v="$VERSION" '$0 ~ "^## \\[" v "\\]" { found = 1; next } /^## \[/ { found = 0 } found' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "CHANGELOG.md has no section for $VERSION" >&2
+            exit 1
+          fi
+          cat >> notes.md <<'NOTES'
+
+          **Install:** unzip, drag Sonar.app into Applications (replace the old one), and open it. Sonar isn't notarized, so the first time macOS will block it: go to System Settings → Privacy & Security and click **Open Anyway**.
+
+          Requires macOS 14+ on Apple silicon.
+          NOTES
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" build/Sonar.zip --clobber
+            gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
+          else
+            gh release create "$GITHUB_REF_NAME" build/Sonar.zip --title "Sonar ${GITHUB_REF_NAME#v}" --notes-file notes.md --verify-tag
+          fi

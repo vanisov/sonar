@@ -5,10 +5,11 @@
 </p>
 
 <p align="center">
-  <a href="#install">install</a> · <a href="#features">features</a> · <a href="#build-from-source">build from source</a> · <a href="#how-it-works">how it works</a>
+  <a href="#install">install</a> · <a href="#features">features</a> · <a href="#build-from-source">build from source</a> · <a href="#how-it-works">how it works</a> · <a href="CHANGELOG.md">changelog</a>
 </p>
 
 <p align="center">
+  <a href="https://github.com/vanisov/sonar/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/vanisov/sonar/ci.yml?branch=main&label=ci&labelColor=333333&color=666666" alt="CI status" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-666666?labelColor=333333" alt="MIT license" /></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-666666?labelColor=333333&logo=apple&logoColor=white" alt="macOS 14+" />
   <img src="https://img.shields.io/badge/Apple%20silicon-only-666666?labelColor=333333" alt="Apple silicon" />
@@ -83,6 +84,14 @@ cheap readings (CPU, memory, network) run every 2 seconds. expensive ones (GPU, 
 ```
 
 and [open an issue](https://github.com/vanisov/sonar/issues) with the output and your Mac model.
+
+## contributing
+
+contributions are welcome. read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR, and see what changed in each version in [CHANGELOG.md](CHANGELOG.md). releases follow [semantic versioning](docs/RELEASING.md).
+
+## agent instructions
+
+if you are an AI agent working on this repository, read [`AGENTS.md`](AGENTS.md) before making changes.
 
 ## thanks
 
