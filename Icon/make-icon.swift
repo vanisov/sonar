@@ -5,25 +5,27 @@
 import AppKit
 import SwiftUI
 
-let teal = Color(red: 0.08, green: 0.72, blue: 0.65)
-let ink = Color(red: 0.07, green: 0.08, blue: 0.09)
+let ink = Color(red: 0.082, green: 0.090, blue: 0.110)  // #15171C
+let signal = Color(red: 1.0, green: 0.357, blue: 0.180)  // #FF5B2E
 
-/// Baseline with one rounded peak, vertically centered as a whole.
-struct Pulse: Shape {
-    var width: CGFloat = 520, height: CGFloat = 260, half: CGFloat = 105
-    func path(in r: CGRect) -> Path {
-        let y = r.midY + height / 2, x = r.midX, x0 = x - width / 2
-        var p = Path()
-        p.move(to: CGPoint(x: x0, y: y))
-        p.addLine(to: CGPoint(x: x - half, y: y))
-        p.addCurve(
-            to: CGPoint(x: x, y: y - height), control1: CGPoint(x: x - half * 0.45, y: y),
-            control2: CGPoint(x: x - half * 0.42, y: y - height))
-        p.addCurve(
-            to: CGPoint(x: x + half, y: y), control1: CGPoint(x: x + half * 0.42, y: y - height),
-            control2: CGPoint(x: x + half * 0.45, y: y))
-        p.addLine(to: CGPoint(x: x0 + width, y: y))
-        return p
+/// The Levels mark: three readings as rounded bars, the one that needs attention in signal orange.
+/// Geometry is in a 236-unit tile (same as the brand board); Sources/Sonar/Brand.swift draws the same mark.
+struct Levels: View {
+    var body: some View {
+        GeometryReader { g in
+            let u = g.size.width / 236
+            ZStack(alignment: .topLeading) {
+                bar(x: 52, y: 106, h: 78, u: u).fill(ink)
+                bar(x: 103, y: 62, h: 122, u: u).fill(ink)
+                bar(x: 154, y: 128, h: 56, u: u).fill(ink.opacity(0.35))
+                Circle().fill(signal).frame(width: 32 * u, height: 32 * u).offset(x: 153 * u, y: 72 * u)
+            }
+        }
+    }
+
+    private func bar(x: CGFloat, y: CGFloat, h: CGFloat, u: CGFloat) -> some Shape {
+        RoundedRectangle(cornerRadius: 15 * u, style: .continuous)
+            .path(in: CGRect(x: x * u, y: y * u, width: 30 * u, height: h * u))
     }
 }
 
@@ -31,11 +33,12 @@ struct Pulse: Shape {
 struct Icon: View {
     var body: some View {
         ZStack {
-            ink
-            Pulse().stroke(teal, style: StrokeStyle(lineWidth: 48, lineCap: .round, lineJoin: .round))
+            LinearGradient(colors: [.white, Color(red: 0.902, green: 0.925, blue: 0.957)], startPoint: .top, endPoint: .bottom)
+            Levels()
         }
         .frame(width: 824, height: 824)
         .clipShape(RoundedRectangle(cornerRadius: 185, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 185, style: .continuous).strokeBorder(.black.opacity(0.08), lineWidth: 3))
         .shadow(color: .black.opacity(0.25), radius: 16, y: 10)
         .frame(width: 1024, height: 1024)
     }

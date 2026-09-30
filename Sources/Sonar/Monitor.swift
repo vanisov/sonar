@@ -35,6 +35,10 @@ struct Ring<Element>: RandomAccessCollection {
     }
 }
 
+struct MemoryBreakdown {
+    var app: UInt64 = 0, wired: UInt64 = 0, compressed: UInt64 = 0, cached: UInt64 = 0, free: UInt64 = 0
+}
+
 struct Sensor: Identifiable {
     let id: String  // SMC key, e.g. "Tp01"
     let code: UInt32
@@ -84,13 +88,25 @@ final class Monitor {
     var gpuTemp: Double?
     var gpuTempHistory = Ring<Float>()
     var fanRPMs: [Double] = []
+    var fanHistories: [Ring<Float>] = []
     var fansAuto = true
+    var coreUsage: [Double] = []  // per core, efficiency cores first on Apple silicon
+    var loadAverage: [Double] = [0, 0, 0]
+    var memoryParts = MemoryBreakdown()
+    var swapUsed: UInt64 = 0
+    var diskRead = 0.0  // bytes/s, all disks
+    var diskWrite = 0.0
+    var diskReadHistory = Ring<Float>()
+    var diskWriteHistory = Ring<Float>()
+    var networkTotal: (down: UInt64, up: UInt64) = (0, 0)  // since boot, physical interfaces
     var apps: [AppUsage] = []  // sorted by memory
     var uptime: TimeInterval = 0
 
     let chip = sysctlString("machdep.cpu.brand_string").replacingOccurrences(of: "Apple ", with: "")
     let memoryTotal = ProcessInfo.processInfo.physicalMemory
     let cores = ProcessInfo.processInfo.activeProcessorCount
+    let efficiencyCores = Int(sysctlValue("hw.perflevel1.logicalcpu", Int32(0)))
+    let fanLimits: [(min: Double, max: Double)]
     let osVersion: String = {
         let v = ProcessInfo.processInfo.operatingSystemVersion
         return "macOS \(v.majorVersion).\(v.minorVersion)"
@@ -103,6 +119,8 @@ final class Monitor {
     @ObservationIgnored private var tick = 0
     @ObservationIgnored private let smc: SMC?
     @ObservationIgnored private let fanKeys: [(actual: UInt32, mode: UInt32)]
+    @ObservationIgnored private var lastCoreTicks: [(busy: UInt64, total: UInt64)] = []
+    @ObservationIgnored private var lastDisk: (read: UInt64, write: UInt64)?
     @ObservationIgnored private let gpuEntries: [io_registry_entry_t]
     @ObservationIgnored private var lastTicks: (busy: UInt64, total: UInt64)?
     @ObservationIgnored private var lastNet: (down: UInt64, up: UInt64)?
@@ -132,6 +150,8 @@ final class Monitor {
             .sorted { (Sensor.groupOrder.firstIndex(of: $0.group)!, $0.id) < (Sensor.groupOrder.firstIndex(of: $1.group)!, $1.id) }
         let fanCount = Int(smc?.read(SMC.fourCC("FNum")) ?? 0)
         fanKeys = (0..<fanCount).map { (SMC.fourCC("F\($0)Ac"), SMC.fourCC("F\($0)Md")) }
+        fanLimits = (0..<fanCount).map { (smc?.read("F\($0)Mn") ?? 0, smc?.read("F\($0)Mx") ?? 0) }
+        fanHistories = Array(repeating: Ring<Float>(), count: fanCount)
         gpuEntries = Self.acceleratorEntries()
         // Tolerance lets macOS coalesce our wake-ups with other timers, which is what Energy Impact counts.
         Task { while true { sample(); try? await Task.sleep(for: Self.interval, tolerance: .milliseconds(500)) } }
@@ -155,14 +175,21 @@ final class Monitor {
         times.append(now)
 
         // Cheap (one syscall each) and feeds the menu bar and history, so always read.
-        let ticks = cpuTicks()
+        let perCore = cpuTicks()
+        let ticks = perCore.reduce((busy: UInt64(0), total: UInt64(0))) { ($0.busy + $1.busy, $0.total + $1.total) }
         if let last = lastTicks, ticks.total > last.total {
             cpu = Double(ticks.busy - last.busy) / Double(ticks.total - last.total) * 100
         }
+        if lastCoreTicks.count == perCore.count {
+            coreUsage = zip(perCore, lastCoreTicks).map { now, before in
+                now.total > before.total ? Double(now.busy - before.busy) / Double(now.total - before.total) * 100 : 0
+            }
+        }
         lastTicks = ticks
+        lastCoreTicks = perCore
         cpuHistory.append(Float(cpu))
 
-        memoryUsed = usedMemory()
+        (memoryUsed, memoryParts) = readMemory()
         memoryHistory.append(Float(memoryPercent))
         pressure =
             switch sysctlValue("kern.memorystatus_vm_pressure_level", Int32(1)) {
@@ -177,6 +204,7 @@ final class Monitor {
             up = Double(net.up &- last.up) / elapsed
         }
         lastNet = net
+        networkTotal = net
         downHistory.append(Float(down))
         upHistory.append(Float(up))
 
@@ -199,17 +227,40 @@ final class Monitor {
             diskFree = v.volumeAvailableCapacityForImportantUsage ?? 0
         }
 
-        let hotTemps = watched || slowTick || menuBar.contains("Temp")
+        if watched || slowTick {
+            let disk = diskBytes()
+            if let last = lastDisk {
+                let span = watched ? elapsed : max(elapsed, 2) * (slowTick ? 1 : 5)
+                diskRead = Double(disk.read &- last.read) / span
+                diskWrite = Double(disk.write &- last.write) / span
+            }
+            lastDisk = disk
+        }
+        diskReadHistory.append(Float(diskRead))
+        diskWriteHistory.append(Float(diskWrite))
+
+        if watched {
+            var loads = [Double](repeating: 0, count: 3)
+            getloadavg(&loads, 3)
+            loadAverage = loads
+            swapUsed = sysctlValue("vm.swapusage", xsw_usage()).xsu_used
+        }
+
+        // SMC reads are most of Sonar's idle cost. With nothing open, read only the group the menu bar shows,
+        // every other tick; everything refreshes every 10 s regardless so history stays useful.
+        let menuTick = tick % 2 == 1
+        let readCPU = watched || slowTick || (menuTick && menuBar.contains("cpuTemp"))
+        let readGPU = watched || slowTick || (menuTick && menuBar.contains("gpuTemp"))
         var updated = sensors
         sensors = []  // drop our reference so `updated` mutates in place instead of copying every history
         for i in updated.indices {
-            let hot = updated[i].group == "CPU" || updated[i].group == "GPU"
-            guard hot ? hotTemps : slowTick else { continue }
+            let group = updated[i].group
+            guard group == "CPU" ? readCPU : group == "GPU" ? readGPU : slowTick else { continue }
             if let v = smc?.read(updated[i].code), Self.plausibleTemp(v) { updated[i].value = v }
             updated[i].history.append(Float(updated[i].value))
         }
         sensors = updated
-        cpuTemp = average(of: "CPU")
+        cpuTemp = Prefs.bool(Prefs.cpuTempSource, default: false) ? hottest(of: "CPU") : average(of: "CPU")
         gpuTemp = average(of: "GPU")
         cpuTempHistory.append(Float(cpuTemp ?? 0))
         gpuTempHistory.append(Float(gpuTemp ?? 0))
@@ -218,10 +269,15 @@ final class Monitor {
             fanRPMs = fanKeys.compactMap { smc?.read($0.actual) }
             fansAuto = fanKeys.allSatisfy { smc?.read($0.mode) != 1 }  // 0 = auto, 3 = stopped by macOS at idle, 1 = forced
         }
+        for i in fanHistories.indices { fanHistories[i].append(Float(i < fanRPMs.count ? fanRPMs[i] : 0)) }
 
         // Only visible in views. Always scan once at launch so the first open has a CPU baseline.
         if watched || tick == 1 { sampleApps() }
         uptime = now.timeIntervalSince1970 - Double(sysctlValue("kern.boottime", timeval()).tv_sec)
+    }
+
+    private func hottest(of group: String) -> Double? {
+        sensors.filter { $0.group == group }.map(\.value).max()
     }
 
     private func average(of group: String) -> Double? {
@@ -230,27 +286,24 @@ final class Monitor {
         return count == 0 ? nil : sum / Double(count)
     }
 
-    private func cpuTicks() -> (busy: UInt64, total: UInt64) {
+    private func cpuTicks() -> [(busy: UInt64, total: UInt64)] {
         var count: natural_t = 0
         var info: processor_info_array_t?
         var infoCount: mach_msg_type_number_t = 0
         guard host_processor_info(mach_host_self(), PROCESSOR_CPU_LOAD_INFO, &count, &info, &infoCount) == KERN_SUCCESS,
             let info
-        else { return (0, 0) }
+        else { return [] }
         defer { vm_deallocate(mach_task_self_, vm_address_t(bitPattern: info), vm_size_t(Int(infoCount) * MemoryLayout<integer_t>.stride)) }
-        var busy: UInt64 = 0, total: UInt64 = 0
-        for core in 0..<Int(count) {
+        return (0..<Int(count)).map { core in
             let base = core * Int(CPU_STATE_MAX)
             func ticks(_ state: Int32) -> UInt64 { UInt64(UInt32(bitPattern: info[base + Int(state)])) }
             let used = ticks(CPU_STATE_USER) + ticks(CPU_STATE_SYSTEM) + ticks(CPU_STATE_NICE)
-            busy += used
-            total += used + ticks(CPU_STATE_IDLE)
+            return (used, used + ticks(CPU_STATE_IDLE))
         }
-        return (busy, total)
     }
 
-    /// Activity Monitor's "Memory Used": app memory + wired + compressed.
-    private func usedMemory() -> UInt64 {
+    /// Activity Monitor's "Memory Used" (app memory + wired + compressed), plus the parts for the breakdown.
+    private func readMemory() -> (UInt64, MemoryBreakdown) {
         var stats = vm_statistics64()
         var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
         let kr = withUnsafeMutablePointer(to: &stats) {
@@ -258,11 +311,34 @@ final class Monitor {
                 host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
             }
         }
-        guard kr == KERN_SUCCESS else { return 0 }
-        let pages =
-            UInt64(stats.internal_page_count) - min(UInt64(stats.purgeable_count), UInt64(stats.internal_page_count))
-            + UInt64(stats.wire_count) + UInt64(stats.compressor_page_count)
-        return pages * UInt64(vm_kernel_page_size)
+        guard kr == KERN_SUCCESS else { return (0, MemoryBreakdown()) }
+        let page = UInt64(vm_kernel_page_size)
+        let purgeable = UInt64(stats.purgeable_count)
+        var parts = MemoryBreakdown()
+        parts.app = (UInt64(stats.internal_page_count) - min(purgeable, UInt64(stats.internal_page_count))) * page
+        parts.wired = UInt64(stats.wire_count) * page
+        parts.compressed = UInt64(stats.compressor_page_count) * page
+        parts.cached = (UInt64(stats.external_page_count) + purgeable) * page
+        parts.free = (UInt64(stats.free_count) + UInt64(stats.speculative_count)) * page
+        return (parts.app + parts.wired + parts.compressed, parts)
+    }
+
+    /// Total bytes read and written by every block storage driver since boot.
+    private func diskBytes() -> (read: UInt64, write: UInt64) {
+        var iter: io_iterator_t = 0
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOBlockStorageDriver"), &iter) == KERN_SUCCESS
+        else { return (0, 0) }
+        defer { IOObjectRelease(iter) }
+        var read: UInt64 = 0, write: UInt64 = 0
+        while case let entry = IOIteratorNext(iter), entry != 0 {
+            defer { IOObjectRelease(entry) }
+            let stats =
+                IORegistryEntryCreateCFProperty(entry, "Statistics" as CFString, kCFAllocatorDefault, 0)?
+                .takeRetainedValue() as? [String: Any]
+            read += (stats?["Bytes (Read)"] as? UInt64) ?? 0
+            write += (stats?["Bytes (Write)"] as? UInt64) ?? 0
+        }
+        return (read, write)
     }
 
     private static func acceleratorEntries() -> [io_registry_entry_t] {

@@ -2,7 +2,6 @@ import SwiftUI
 
 struct PanelView: View {
     let monitor: Monitor
-    @Binding var showingSettings: Bool
     @State private var visible = false
     @State private var size = CGSize(width: 380, height: 740)
     @Environment(\.dismiss) private var dismiss
@@ -13,16 +12,17 @@ struct PanelView: View {
             // observing Monitor; otherwise every sample re-rendered it and animations never settled (~20% CPU).
             if !visible {
                 Color.clear.frame(width: size.width, height: size.height)
-            } else if showingSettings {
-                SettingsView { showingSettings = false }
             } else {
                 PanelContent(
                     monitor: monitor,
                     openDashboard: { section in
                         dismiss()  // a new key window doesn't close the popover on its own
-                        DashboardWindow.show(monitor, section: section)
+                        DashboardWindow.show(section)
                     },
-                    openSettings: { showingSettings = true }
+                    openSettings: {
+                        dismiss()
+                        SettingsWindow.open()
+                    }
                 )
                 .background(
                     GeometryReader { g in
@@ -41,65 +41,183 @@ struct PanelView: View {
     }
 }
 
+/// A card in the panel. Order and visibility are stored as "cpu,gpu,-memory,…" where "-" means hidden.
+enum PanelCard: String, CaseIterable, Identifiable {
+    case cpu, gpu, memory, disk, network, fans, apps
+
+    static let defaults = allCases.map(\.rawValue).joined(separator: ",")
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .cpu: "CPU"
+        case .gpu: "GPU"
+        case .memory: "Memory"
+        case .disk: "Disk"
+        case .network: "Network"
+        case .fans: "Fans"
+        case .apps: "Top apps"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .cpu: "cpu"
+        case .gpu: "square.stack.3d.up"
+        case .memory: "memorychip"
+        case .disk: "internaldrive"
+        case .network: "network"
+        case .fans: "fan"
+        case .apps: "chart.bar.fill"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .cpu: .blue
+        case .gpu: .pink
+        case .memory: .purple
+        case .disk: .orange
+        case .network: .green
+        case .fans: .teal
+        case .apps: .indigo
+        }
+    }
+
+    var section: DashboardSection {
+        switch self {
+        case .cpu: .cpu
+        case .gpu: .gpu
+        case .memory: .memory
+        case .disk: .disk
+        case .network: .network
+        case .fans: .fans
+        case .apps: .apps
+        }
+    }
+
+    private static var saved: [(card: PanelCard, shown: Bool)] {
+        Prefs.string(Prefs.panelCards, default: defaults).split(separator: ",").compactMap { token in
+            let hidden = token.hasPrefix("-")
+            return PanelCard(rawValue: String(hidden ? token.dropFirst() : token)).map { ($0, !hidden) }
+        }
+    }
+
+    static var order: [PanelCard] {
+        let known = saved.map(\.card)
+        return known + allCases.filter { !known.contains($0) }
+    }
+
+    static var enabled: [PanelCard] {
+        let hidden = Set(saved.filter { !$0.shown }.map(\.card))
+        return order.filter { !hidden.contains($0) }
+    }
+
+    static func encode(order: [PanelCard], shown: Set<PanelCard>) -> String {
+        order.map { shown.contains($0) ? $0.rawValue : "-" + $0.rawValue }.joined(separator: ",")
+    }
+}
+
 /// The panel itself, without the visibility handling (also used by `--snapshot`).
 struct PanelContent: View {
     let monitor: Monitor
-    var openDashboard: (DashboardView.Section) -> Void = { _ in }
+    var openDashboard: (DashboardSection?) -> Void = { _ in }
     var openSettings: () -> Void = {}
+    @AppStorage(Prefs.panelCards) private var cardsRaw = PanelCard.defaults
+    @AppStorage(Prefs.panelTopApps) private var topApps = 5
+    @AppStorage(Prefs.panelSparkline) private var sparkline = 60
+    @AppStorage(Prefs.panelCardClick) private var cardOpens = true
+    @AppStorage(TemperatureUnit.storageKey) private var unit = TemperatureUnit.system.rawValue
+    @AppStorage(Prefs.storageBinary) private var binary = false
+    @AppStorage(Prefs.networkBits) private var bits = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 6) {
                 Chip(text: monitor.chip)
-                Chip(text: Int64(monitor.memoryTotal).formatted(.byteCount(style: .memory)))
+                Chip(text: Fmt.memory(monitor.memoryTotal))
                 Chip(text: monitor.osVersion)
             }
             Grid(horizontalSpacing: 10, verticalSpacing: 10) {
-                GridRow {
-                    card(.overview) { cpu }
-                    card(.overview) { gpu }
-                }
-                GridRow {
-                    card(.overview) { memory }
-                    card(.overview) { disk }
-                }
-                GridRow {
-                    card(.overview) { network }
-                    card(.sensors) { fans }
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    if row == [.apps] {
+                        GridRow { card(.apps).gridCellColumns(2) }
+                    } else {
+                        GridRow {
+                            ForEach(row) { card($0) }
+                            if row.count == 1 { Color.clear.gridCellUnsizedAxes([.horizontal, .vertical]) }
+                        }
+                    }
                 }
             }
-            card(.apps) { TopAppsCard(apps: Array(monitor.apps.prefix(5))) }
             footer
         }
         .padding(16)
         .frame(width: 380)
     }
 
-    private func card(_ section: DashboardView.Section, @ViewBuilder content: () -> some View) -> some View {
-        Button {
-            openDashboard(section)
-        } label: {
-            content()
+    /// Metric cards pair up two per row; Top apps always takes a full row.
+    private var rows: [[PanelCard]] {
+        var rows: [[PanelCard]] = []
+        var pending: [PanelCard] = []
+        for card in PanelCard.enabled {
+            if card == .apps {
+                if !pending.isEmpty { rows.append(pending) }
+                pending = []
+                rows.append([.apps])
+            } else {
+                pending.append(card)
+                if pending.count == 2 {
+                    rows.append(pending)
+                    pending = []
+                }
+            }
         }
-        .buttonStyle(CardButtonStyle())
+        if !pending.isEmpty { rows.append(pending) }
+        return rows
     }
+
+    @ViewBuilder private func card(_ card: PanelCard) -> some View {
+        let content = Group {
+            switch card {
+            case .cpu: cpu
+            case .gpu: gpu
+            case .memory: memory
+            case .disk: disk
+            case .network: network
+            case .fans: fans
+            case .apps: TopAppsCard(apps: Array(monitor.apps.prefix(topApps)))
+            }
+        }
+        if cardOpens {
+            Button {
+                openDashboard(card.section)
+            } label: {
+                content
+            }.buttonStyle(CardButtonStyle())
+        } else {
+            content
+        }
+    }
+
+    private var window: String { sparkline >= 150 ? "5 min" : sparkline <= 30 ? "1 min" : "2 min" }
 
     private var cpu: some View {
         MetricCard(
             title: "CPU", symbol: "cpu", tint: .blue, badge: monitor.cpuTemp.map { TemperatureUnit.format($0) },
             value: monitor.cpu.formatted(.number.precision(.fractionLength(1))), unit: "%",
-            footer: "\(monitor.cores) logical cores · 2 min"
+            footer: "\(monitor.cores) logical cores · \(window)"
         ) {
-            Sparkline(values: monitor.cpuHistory, tint: .blue)
+            Sparkline(values: monitor.cpuHistory, tint: .blue, window: sparkline)
         }
     }
 
     private var gpu: some View {
         MetricCard(
             title: "GPU", symbol: "square.stack.3d.up", tint: .pink, badge: monitor.gpuTemp.map { TemperatureUnit.format($0) },
-            value: "\(Int(monitor.gpu))", unit: "%", footer: "Device activity · 2 min"
+            value: "\(Int(monitor.gpu))", unit: "%", footer: "Device activity · \(window)"
         ) {
-            Sparkline(values: monitor.gpuHistory, tint: .pink)
+            Sparkline(values: monitor.gpuHistory, tint: .pink, window: sparkline)
         }
     }
 
@@ -107,20 +225,20 @@ struct PanelContent: View {
         MetricCard(
             title: "Memory", symbol: "memorychip", tint: .purple, badge: monitor.pressure,
             value: monitor.memoryPercent.formatted(.number.precision(.fractionLength(1))), unit: "%",
-            footer: "\(PanelView.bytes(monitor.memoryUsed, .memory)) / \(PanelView.bytes(monitor.memoryTotal, .memory))"
+            footer: "\(Fmt.memory(monitor.memoryUsed)) / \(Fmt.memory(monitor.memoryTotal))"
         ) {
-            Sparkline(values: monitor.memoryHistory, tint: .purple)
+            Sparkline(values: monitor.memoryHistory, tint: .purple, window: sparkline)
         }
     }
 
     private var disk: some View {
         let used = monitor.diskTotal - monitor.diskFree
         let fraction = monitor.diskTotal > 0 ? Double(used) / Double(monitor.diskTotal) : 0
-        let (value, unit) = PanelView.split(PanelView.bytes(monitor.diskFree, .file))
+        let (value, unit) = Fmt.split(Fmt.storage(monitor.diskFree))
         return MetricCard(
-            title: "Disk", symbol: "internaldrive", tint: .orange, badge: PanelView.bytes(monitor.diskTotal, .file),
+            title: "Disk", symbol: "internaldrive", tint: .orange, badge: Fmt.storage(monitor.diskTotal),
             value: value, unit: "\(unit) free",
-            footer: "\(PanelView.bytes(used, .file)) used · \(Int(fraction * 100))%"
+            footer: "\(Fmt.storage(used)) used · \(Int(fraction * 100))%"
         ) {
             GeometryReader { g in
                 ZStack(alignment: .leading) {
@@ -133,13 +251,13 @@ struct PanelContent: View {
     }
 
     private var network: some View {
-        let (value, unit) = PanelView.split(PanelView.bytes(monitor.down, .file))
+        let (value, unit) = Fmt.split(Fmt.rate(monitor.down))
         return MetricCard(
             title: "Network", symbol: "network", tint: .green, badge: "↓ / ↑",
-            value: value, unit: "\(unit)/s",
-            footer: "↓ Download · ↑ \(PanelView.bytes(monitor.up, .file))/s"
+            value: value, unit: unit,
+            footer: "↓ Download · ↑ \(Fmt.rate(monitor.up))"
         ) {
-            Sparkline(values: monitor.downHistory, tint: .green, maxValue: nil)
+            Sparkline(values: monitor.downHistory, tint: .green, maxValue: nil, window: sparkline)
         }
     }
 
@@ -159,13 +277,13 @@ struct PanelContent: View {
     private var footer: some View {
         HStack(spacing: 2) {
             Button {
-                openDashboard(.overview)
+                openDashboard(nil)
             } label: {
                 Label("Open dashboard", systemImage: "square.grid.2x2")
             }
             Spacer()
             Button(action: openSettings) { Image(systemName: "slider.horizontal.3") }
-                .help("Settings")
+                .help("Settings (⌘,)")
             Button {
                 NSApp.terminate(nil)
             } label: {
@@ -177,23 +295,6 @@ struct PanelContent: View {
         .font(.system(size: 12, weight: .medium))
         .padding(.horizontal, -8)  // align the hover highlight's text with the cards above
     }
-}
-
-extension PanelView {
-    // MARK: Formatting
-
-    static func bytes<T: BinaryInteger>(_ v: T, _ style: ByteCountFormatStyle.Style) -> String {
-        Int64(v).formatted(.byteCount(style: style, spellsOutZero: false))
-    }
-
-    static func bytes(_ v: Double, _ style: ByteCountFormatStyle.Style) -> String { bytes(Int64(max(v, 0)), style) }
-
-    /// "293.11 GB" -> ("293.11", "GB")
-    static func split(_ s: String) -> (String, String) {
-        let parts = s.split(whereSeparator: \.isWhitespace)
-        return (String(parts.first ?? ""), parts.dropFirst().joined(separator: " "))
-    }
-
 }
 
 // MARK: Components
@@ -242,7 +343,7 @@ struct HoverButtonStyle: ButtonStyle {
 }
 
 /// A whole card as a button: lightens on hover, darkens while pressed.
-private struct CardButtonStyle: ButtonStyle {
+struct CardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View { Styled(configuration: configuration) }
 
     private struct Styled: View {
@@ -364,7 +465,7 @@ private struct TopAppsCard: View {
                     if let icon = app.icon { Image(nsImage: icon).resizable().frame(width: 18, height: 18) }
                     Text(app.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
                     Spacer()
-                    Text(PanelView.bytes(app.memory, .memory)).frame(width: 72, alignment: .trailing)
+                    Text(Fmt.memory(app.memory)).frame(width: 72, alignment: .trailing)
                     Text(app.cpu.formatted(.number.precision(.fractionLength(1))) + "%").frame(width: 46, alignment: .trailing)
                 }
                 .font(.system(size: 12))
