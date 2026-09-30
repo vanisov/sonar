@@ -8,6 +8,9 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 
 ## [Unreleased]
 
+### Changed
+- The "sonar" wordmark in the dashboard sidebar is easier to read in light and dark mode.
+
 ## [1.3.1] - 2026-09-30
 
 ### Changed
