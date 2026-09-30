@@ -50,8 +50,11 @@ struct ChartSeries: Identifiable {
 
 /// Samples inside the chosen range, grouped into runs (a new run starts after a sampling pause, e.g. sleep),
 /// and thinned to at most `limit` points so an hour of 2-second samples stays cheap to draw.
+/// Each point's `id` is its time (or its clock-aligned bucket when thinned), so thinned points don't jump between
+/// buckets as new samples arrive. Charts aren't animated: Swift Charts re-lays out every mark per frame (~35% CPU).
 struct VisiblePoints {
-    let indices: [(index: Int, run: Int)]
+    typealias Point = (index: Int, run: Int, id: Double)
+    let indices: [Point]
 
     init(times: Ring<Date>, lead: Ring<Float>?, range: TimeInterval, limit: Int = 240) {
         guard let end = times.last else {
@@ -59,24 +62,27 @@ struct VisiblePoints {
             return
         }
         let start = end.addingTimeInterval(-range)
-        var all: [(index: Int, run: Int)] = []
+        var all: [Point] = []
         var run = 0
         for i in 0..<times.count where times[i] >= start {
             if let last = all.last, times[i].timeIntervalSince(times[last.index]) > 10 { run += 1 }
-            all.append((i, run))
+            all.append((i, run, times[i].timeIntervalSince1970))
         }
         guard all.count > limit, let lead else {
             indices = all
             return
         }
-        // Keep the peak of each bucket so short spikes stay visible.
-        let bucket = Int((Double(all.count) / Double(limit)).rounded(.up))
-        var thinned: [(index: Int, run: Int)] = []
-        var i = 0
-        while i < all.count {
-            let slice = all[i..<min(i + bucket, all.count)].filter { $0.run == all[i].run }
-            if let peak = slice.max(by: { lead[$0.index] < lead[$1.index] }) { thinned.append(peak) }
-            i += max(slice.count, 1)
+        // Fixed time buckets (a multiple of the 2 s sample interval), keeping each bucket's peak so spikes stay
+        // visible. Buckets are aligned to the clock, so they don't shift between updates.
+        let bucket = max(2, (range / Double(limit) / 2).rounded(.up) * 2)
+        var thinned: [Point] = []
+        for p in all {
+            let key = (p.id / bucket).rounded(.down) * bucket
+            if let last = thinned.last, last.id == key, last.run == p.run {
+                if lead[p.index] > lead[last.index] { thinned[thinned.count - 1] = (p.index, p.run, key) }
+            } else {
+                thinned.append((p.index, p.run, key))
+            }
         }
         indices = thinned
     }
@@ -106,7 +112,7 @@ struct HistoryChart: View {
         let end = times.last ?? .now
         Chart {
             ForEach(series) { s in
-                ForEach(points, id: \.index) { p in
+                ForEach(points, id: \.id) { p in
                     let value = Double(s.values[p.index]) * s.scale
                     LineMark(x: .value("Time", times[p.index]), y: .value("Value", value), series: .value("Series", "\(s.name) \(p.run)"))
                         .foregroundStyle(s.color)

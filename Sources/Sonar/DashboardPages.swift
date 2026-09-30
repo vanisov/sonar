@@ -193,13 +193,7 @@ struct UsageBar: View {
     let color: Color
 
     var body: some View {
-        GeometryReader { g in
-            ZStack(alignment: .leading) {
-                Capsule().fill(.primary.opacity(0.08))
-                Capsule().fill(color.gradient).frame(width: g.size.width * min(max(fraction, 0), 1))
-            }
-        }
-        .frame(height: 8)
+        LevelBar(fraction: fraction, color: color, cornerRadius: 4).frame(height: 8)
     }
 }
 
@@ -308,14 +302,8 @@ struct CPUPage: View {
                     ForEach(Array(m.coreUsage.enumerated()), id: \.offset) { i, usage in
                         let efficiency = i < m.efficiencyCores
                         VStack(spacing: 4) {
-                            GeometryReader { g in
-                                ZStack(alignment: .bottom) {
-                                    RoundedRectangle(cornerRadius: 5, style: .continuous).fill(.primary.opacity(0.07))
-                                    RoundedRectangle(cornerRadius: 5, style: .continuous).fill(efficiency ? Color.teal : .blue)
-                                        .frame(height: g.size.height * min(usage / 100, 1))
-                                }
-                            }
-                            .frame(height: 70)
+                            LevelBar(fraction: usage / 100, color: efficiency ? .teal : .blue, vertical: true, cornerRadius: 5)
+                                .frame(height: 70)
                             Text(efficiency ? "E\(i + 1)" : "P\(i - m.efficiencyCores + 1)").font(.caption2).foregroundStyle(.secondary)
                         }
                         .help("\(Fmt.percent(usage))")

@@ -145,7 +145,6 @@ struct DashboardView: View {
                 }
                 .searchable(text: $nav.query, placement: .toolbar, prompt: "Search apps, sensors, sections")
         }
-        .tint(.signal)
         .onChange(of: nav.section) { _, new in
             if new?.isMetric == true { metricsExpanded = true }  // reveal the selected sub-item
         }
@@ -176,29 +175,22 @@ struct DashboardView: View {
                 DisclosureGroup(isExpanded: $metricsExpanded) {
                     ForEach(DashboardSection.metrics) { row($0).tag($0) }
                 } label: {
-                    row(.overview).tag(DashboardSection.overview)
+                    row(.overview).padding(.leading, 4).tag(DashboardSection.overview)  // breathing room after the chevron
                 }
             } header: {
-                BrandLockup().padding(.bottom, 8)
+                BrandLockup().padding(.top, 6).padding(.bottom, 26)
             }
             Section("Manage") { row(.apps).tag(DashboardSection.apps) }
             Section("Mac") { row(.system).tag(DashboardSection.system) }
         }
         .listStyle(.sidebar)
+        .environment(\.sidebarRowSize, .small)
     }
 
+    /// A standard sidebar row: icon tinted by the system accent, live value as a sidebar badge.
     private func row(_ s: DashboardSection) -> some View {
-        HStack {
-            Label {
-                Text(s.title)
-            } icon: {
-                Image(systemName: s.symbol).foregroundStyle(s.tint)
-            }
-            Spacer(minLength: 4)
-            if let value = sidebarValue(s) {
-                Text(value).font(.caption).monospacedDigit().foregroundStyle(.secondary)
-            }
-        }
+        Label(s.title, systemImage: s.symbol)
+            .badge(sidebarValue(s).map { Text($0).monospacedDigit() })
     }
 
     private func sidebarValue(_ s: DashboardSection) -> String? {
