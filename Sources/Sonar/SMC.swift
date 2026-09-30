@@ -1,3 +1,4 @@
+import Foundation
 import IOKit
 
 /// Mirrors the kernel's SMCKeyData_t (80 bytes). Field order and the explicit padding matter.
@@ -36,9 +37,12 @@ final class SMC {
 
     deinit { IOServiceClose(conn) }
 
-    func read(_ key: String) -> Double? {
+    func read(_ key: String) -> Double? { read(Self.fourCC(key)) }
+
+    /// Read by four-char code; precompute codes with `SMC.fourCC` for hot paths.
+    func read(_ code: UInt32) -> Double? {
         var input = SMCKeyData()
-        input.key = Self.fourCC(key)
+        input.key = code
         if let cached = infoCache[input.key] {
             input.keyInfo = cached
         } else {
@@ -84,7 +88,7 @@ final class SMC {
         }
     }
 
-    private static func fourCC(_ s: String) -> UInt32 { s.utf8.reduce(0) { $0 << 8 | UInt32($1) } }
+    static func fourCC(_ s: String) -> UInt32 { s.utf8.reduce(0) { $0 << 8 | UInt32($1) } }
 
     private static func string(_ v: UInt32) -> String {
         String(bytes: [24, 16, 8, 0].map { UInt8(truncatingIfNeeded: v >> $0) }, encoding: .ascii) ?? ""

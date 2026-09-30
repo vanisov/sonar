@@ -1,6 +1,35 @@
 import Charts
 import SwiftUI
 
+/// Created on demand and torn down on close. A SwiftUI `Window` scene stays alive offscreen
+/// and kept redrawing its hour-long charts while hidden.
+@MainActor enum DashboardWindow {
+    private static var window: NSWindow?
+
+    static func show(_ monitor: Monitor) {
+        if window == nil {
+            let host = NSHostingController(rootView: DashboardView(monitor: monitor))
+            host.sceneBridgingOptions = .all // lets the split view install its sidebar toolbar
+            let w = NSWindow(contentViewController: host)
+            w.title = "Sonar"
+            w.styleMask.insert(.fullSizeContentView)
+            w.setContentSize(NSSize(width: 980, height: 700))
+            w.isReleasedWhenClosed = false
+            w.center()
+            NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { note in
+                MainActor.assumeIsolated {
+                    // AppKit can keep a closed window around; detach the SwiftUI tree so it stops updating.
+                    (note.object as? NSWindow)?.contentViewController = nil
+                    window = nil
+                }
+            }
+            window = w
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        window?.makeKeyAndOrderFront(nil)
+    }
+}
+
 struct DashboardView: View {
     let monitor: Monitor
     @State private var section: Section? = .overview
@@ -30,6 +59,8 @@ struct DashboardView: View {
             case .apps: AppsTable(apps: monitor.apps)
             }
         }
+        .onAppear(perform: monitor.viewAppeared)
+        .onDisappear(perform: monitor.viewDisappeared)
     }
 }
 
@@ -72,8 +103,8 @@ private struct OverviewView: View {
 
 private struct HistoryCard: View {
     let title: String, symbol: String, value: String
-    let times: [Date]
-    let series: [(name: String, values: [Double], color: Color)]
+    let times: Ring<Date>
+    let series: [(name: String, values: Ring<Float>, color: Color)]
     var domain: ClosedRange<Double>?
     let axis: (Double) -> String
 
@@ -97,7 +128,7 @@ private struct HistoryCard: View {
                     }
                 }
             }
-            .chartYScale(domain: domain ?? 0...max(series.flatMap(\.values).max() ?? 1, 1))
+            .chartYScale(domain: domain ?? 0...max(Double(series.compactMap { $0.values.max() }.max() ?? 1), 1))
             .chartXScale(domain: (times.last ?? .now).addingTimeInterval(-3600)...(times.last ?? .now))
             .chartXAxis {
                 AxisMarks(values: .stride(by: .minute, count: 10)) {

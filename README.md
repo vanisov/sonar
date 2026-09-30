@@ -33,7 +33,7 @@
 - **your numbers in the menu bar** — pick any mix of CPU %, CPU temp, GPU temp, memory, network and fan speed.
 - **a dashboard when you want more** — an hour of history for every metric, every temperature sensor on your Mac, and a sortable list of every app.
 - **apps, not processes** — helpers are counted toward the app that owns them, so Safari's web content processes show up as Safari.
-- **light on your mac** — under 2% of one core, no helper tools, no root, no network access, no telemetry.
+- **light on your mac** — about 0.3% of one core and ~20 MB of memory when idle, no idle wake-ups, no helper tools, no root, no network access, no telemetry. expensive readings only run while you're looking.
 - **100% Swift** — SwiftUI and Swift Charts, no dependencies, about 1,000 lines.
 
 ## install
@@ -58,6 +58,8 @@ cd sonar
 
 the app icon is drawn in code: edit `Icon/make-icon.swift` and run it to regenerate `Icon/Sonar.icns`.
 
+`./perf.sh` checks the running app against its idle budget (CPU, memory, wake-ups). close the panel first.
+
 ## how it works
 
 | metric | source |
@@ -70,7 +72,7 @@ the app icon is drawn in code: edit `Icon/make-icon.swift` and run it to regener
 | temperatures, fans | read-only SMC access through IOKit |
 | top apps | `proc_pid_rusage`, grouped by the responsible app |
 
-everything is sampled every 2 seconds and kept in memory for an hour. nothing is written to disk except your settings.
+cheap readings (CPU, memory, network) run every 2 seconds. expensive ones (GPU, temperatures, fans, per-app usage) run every 2 seconds only while the panel or dashboard is open, or when the menu bar shows them, and every 10 seconds otherwise. an hour of history is kept in memory in fixed-size buffers. nothing is written to disk except your settings.
 
 ## troubleshooting
 

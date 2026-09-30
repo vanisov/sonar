@@ -1,16 +1,33 @@
-import Charts
 import SwiftUI
 
 struct PanelView: View {
     let monitor: Monitor
     @Binding var showingSettings: Bool
-    @Environment(\.openWindow) private var openWindow
+    @State private var visible = false
+    @State private var size = CGSize(width: 380, height: 794)
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        if showingSettings {
-            SettingsView { showingSettings = false }
-        } else {
-            panel
+        Group {
+            // MenuBarExtra keeps a closed popover alive offscreen. Rendering nothing while closed stops it
+            // observing Monitor; otherwise every sample re-rendered it and the digit animations never settled (~20% CPU).
+            if !visible {
+                Color.clear.frame(width: size.width, height: size.height)
+            } else if showingSettings {
+                SettingsView { showingSettings = false }
+            } else {
+                panel.background(GeometryReader { g in
+                    Color.clear.onAppear { size = g.size }.onChange(of: g.size) { _, new in size = new }
+                })
+            }
+        }
+        .onAppear {
+            visible = true
+            monitor.viewAppeared()
+        }
+        .onDisappear {
+            visible = false
+            monitor.viewDisappeared()
         }
     }
 
@@ -121,8 +138,8 @@ struct PanelView: View {
     private var footer: some View {
         HStack {
             Button {
-                openWindow(id: "dashboard")
-                NSApp.activate(ignoringOtherApps: true)
+                dismiss() // a new key window doesn't close the popover on its own
+                DashboardWindow.show(monitor)
             } label: {
                 Label("Open dashboard", systemImage: "square.grid.2x2")
             }
@@ -223,28 +240,49 @@ private struct MetricCard<Visual: View>: View {
     }
 }
 
+/// Filled sparkline drawn as a plain path; much cheaper to redraw than a Swift Charts chart.
 struct Sparkline: View {
-    let values: [Double], tint: Color
-    var maxValue: Double? = 100
+    let values: Ring<Float>, tint: Color
+    var maxValue: Float? = 100
     var window = 60 // samples shown: 2 min
 
     var body: some View {
-        // Right-align so a fresh history grows in from the right edge.
-        let values = Array(values.suffix(window))
-        let offset = window - values.count
-        Chart(Array(values.enumerated()), id: \.offset) { point in
-            AreaMark(x: .value("t", point.offset + offset), y: .value("v", point.element))
-                .foregroundStyle(LinearGradient(colors: [tint.opacity(0.3), tint.opacity(0)], startPoint: .top, endPoint: .bottom))
-                .interpolationMethod(.monotone)
-            LineMark(x: .value("t", point.offset + offset), y: .value("v", point.element))
-                .foregroundStyle(tint)
-                .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round))
-                .interpolationMethod(.monotone)
+        let shown = Array(values.suffix(window))
+        let top = maxValue ?? max(shown.max() ?? 1, 1)
+        ZStack {
+            SparklineShape(values: shown, window: window, top: top, closed: true)
+                .fill(LinearGradient(colors: [tint.opacity(0.3), tint.opacity(0)], startPoint: .top, endPoint: .bottom))
+            SparklineShape(values: shown, window: window, top: top, closed: false)
+                .stroke(tint, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
         }
-        .chartXScale(domain: 0...(window - 1))
-        .chartYScale(domain: 0...(maxValue ?? max(values.max() ?? 1, 1)))
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
+    }
+}
+
+private struct SparklineShape: Shape {
+    let values: [Float], window: Int, top: Float, closed: Bool
+
+    func path(in rect: CGRect) -> Path {
+        guard values.count > 1 else { return Path() }
+        let r = rect.insetBy(dx: 0, dy: 1) // keep the stroke inside at 0% and 100%
+        let step = r.width / CGFloat(window - 1)
+        let x0 = r.minX + CGFloat(window - values.count) * step // right-aligned: fresh history grows in from the right
+        let points = values.enumerated().map { i, v in
+            CGPoint(x: x0 + CGFloat(i) * step, y: r.maxY - CGFloat(min(max(v / top, 0), 1)) * r.height)
+        }
+        var path = Path()
+        path.move(to: points[0])
+        // Curve through midpoints for a smooth line without overshoot.
+        for i in 1..<points.count {
+            let mid = CGPoint(x: (points[i - 1].x + points[i].x) / 2, y: (points[i - 1].y + points[i].y) / 2)
+            path.addQuadCurve(to: mid, control: points[i - 1])
+        }
+        path.addLine(to: points[points.count - 1])
+        if closed {
+            path.addLine(to: CGPoint(x: points[points.count - 1].x, y: rect.maxY))
+            path.addLine(to: CGPoint(x: points[0].x, y: rect.maxY))
+            path.closeSubpath()
+        }
+        return path
     }
 }
 

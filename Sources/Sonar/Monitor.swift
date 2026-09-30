@@ -10,11 +10,37 @@ struct AppUsage: Identifiable {
     let cpu: Double
 }
 
+/// Fixed-capacity history that overwrites its oldest entry: no per-sample shifting or reallocation.
+struct Ring<Element>: RandomAccessCollection {
+    let capacity: Int
+    private var storage: [Element] = []
+    private var head = 0 // oldest element once full
+
+    init(capacity: Int = Monitor.historyLength) {
+        self.capacity = capacity
+        storage.reserveCapacity(capacity)
+    }
+
+    var startIndex: Int { 0 }
+    var endIndex: Int { storage.count }
+    subscript(i: Int) -> Element { storage[(head + i) % storage.count] }
+
+    mutating func append(_ value: Element) {
+        if storage.count < capacity {
+            storage.append(value)
+        } else {
+            storage[head] = value
+            head = (head + 1) % capacity
+        }
+    }
+}
+
 struct Sensor: Identifiable {
     let id: String // SMC key, e.g. "Tp01"
+    let code: UInt32
     let group: String
     var value: Double
-    var history: [Double] = []
+    var history = Ring<Float>()
 
     static let groupOrder = ["CPU", "GPU", "SSD", "Battery", "Wi-Fi", "Ambient", "Other"]
 
@@ -34,29 +60,29 @@ struct Sensor: Identifiable {
 
 @MainActor @Observable
 final class Monitor {
-    static let historyLength = 1800 // 1 h at 2 s
+    nonisolated static let historyLength = 1800 // 1 h at 2 s
     static let interval: Duration = .seconds(2)
 
-    // Every history array grows in lockstep with `times`.
-    var times: [Date] = []
+    // Every history grows in lockstep with `times`.
+    var times = Ring<Date>()
     var cpu = 0.0
-    var cpuHistory: [Double] = []
+    var cpuHistory = Ring<Float>()
     var gpu = 0.0
-    var gpuHistory: [Double] = []
+    var gpuHistory = Ring<Float>()
     var memoryUsed: UInt64 = 0
-    var memoryHistory: [Double] = []
+    var memoryHistory = Ring<Float>()
     var pressure = "Normal"
     var diskTotal: Int64 = 0
     var diskFree: Int64 = 0
     var down = 0.0
     var up = 0.0
-    var downHistory: [Double] = []
-    var upHistory: [Double] = []
+    var downHistory = Ring<Float>()
+    var upHistory = Ring<Float>()
     var sensors: [Sensor] = []
     var cpuTemp: Double?
-    var cpuTempHistory: [Double] = []
+    var cpuTempHistory = Ring<Float>()
     var gpuTemp: Double?
-    var gpuTempHistory: [Double] = []
+    var gpuTempHistory = Ring<Float>()
     var fanRPMs: [Double] = []
     var fansAuto = true
     var apps: [AppUsage] = [] // sorted by memory
@@ -72,61 +98,76 @@ final class Monitor {
 
     var memoryPercent: Double { Double(memoryUsed) / Double(memoryTotal) * 100 }
 
-    private let smc = SMC()
-    private var lastTicks: (busy: UInt64, total: UInt64)?
-    private var lastNet: (down: UInt64, up: UInt64)?
-    private var lastProcCPU: [pid_t: UInt64] = [:]
-    private var icons: [pid_t: NSImage] = [:] // NSRunningApplication.icon hits the disk every call
-    private var lastSample = Date()
-    private let tickToNanos: Double = {
+    /// Open views (popover, dashboard). Nobody looking = skip the expensive readings.
+    @ObservationIgnored private var viewers = 0
+    @ObservationIgnored private var tick = 0
+    @ObservationIgnored private let smc: SMC?
+    @ObservationIgnored private let fanKeys: [(actual: UInt32, mode: UInt32)]
+    @ObservationIgnored private let gpuEntries: [io_registry_entry_t]
+    @ObservationIgnored private var lastTicks: (busy: UInt64, total: UInt64)?
+    @ObservationIgnored private var lastNet: (down: UInt64, up: UInt64)?
+    @ObservationIgnored private var physicalInterfaces: [UInt16: Bool] = [:]
+    @ObservationIgnored private var lastProcCPU: [pid_t: UInt64] = [:]
+    @ObservationIgnored private var owners: [pid_t: pid_t] = [:]
+    @ObservationIgnored private var icons: [pid_t: NSImage] = [:] // NSRunningApplication.icon hits the disk every call
+    @ObservationIgnored private var lastSample = Date()
+    @ObservationIgnored private var lastAppsSample = Date()
+    @ObservationIgnored private let tickToNanos: Double = {
         var tb = mach_timebase_info_data_t()
         mach_timebase_info(&tb)
         return Double(tb.numer) / Double(tb.denom)
     }()
 
     init() {
+        let smc = SMC()
+        self.smc = smc
         // Sensor keys differ per chip, so discover every temperature key that reads a sane value.
         sensors = (smc?.allKeys() ?? [])
             .filter { $0.hasPrefix("T") }
             .compactMap { key in
-                guard let v = smc?.read(key), Self.plausibleTemp(v) else { return nil }
-                return Sensor(id: key, group: Sensor.group(for: key), value: v)
+                let code = SMC.fourCC(key)
+                guard let v = smc?.read(code), Self.plausibleTemp(v) else { return nil }
+                return Sensor(id: key, code: code, group: Sensor.group(for: key), value: v)
             }
             .sorted { (Sensor.groupOrder.firstIndex(of: $0.group)!, $0.id) < (Sensor.groupOrder.firstIndex(of: $1.group)!, $1.id) }
-        Task { while true { sample(); try? await Task.sleep(for: Self.interval) } }
+        let fanCount = Int(smc?.read(SMC.fourCC("FNum")) ?? 0)
+        fanKeys = (0..<fanCount).map { (SMC.fourCC("F\($0)Ac"), SMC.fourCC("F\($0)Md")) }
+        gpuEntries = Self.acceleratorEntries()
+        // Tolerance lets macOS coalesce our wake-ups with other timers, which is what Energy Impact counts.
+        Task { while true { sample(); try? await Task.sleep(for: Self.interval, tolerance: .milliseconds(500)) } }
     }
+
+    func viewAppeared() {
+        viewers += 1
+        if viewers == 1 { sample() } // fresh numbers the moment something opens
+    }
+
+    func viewDisappeared() { viewers = max(viewers - 1, 0) }
 
     /// Unused sensor slots report whole-number placeholders (e.g. exactly 40.0 on M4); real readings have fractions.
     private static func plausibleTemp(_ v: Double) -> Bool { (15...125).contains(v) && v != v.rounded() }
 
     private func sample() {
+        tick += 1
         let now = Date()
         let elapsed = max(now.timeIntervalSince(lastSample), 0.1)
         lastSample = now
-        push(now, to: &times)
+        times.append(now)
 
+        // Cheap (one syscall each) and feeds the menu bar and history, so always read.
         let ticks = cpuTicks()
         if let last = lastTicks, ticks.total > last.total {
             cpu = Double(ticks.busy - last.busy) / Double(ticks.total - last.total) * 100
         }
         lastTicks = ticks
-        push(cpu, to: &cpuHistory)
-
-        gpu = gpuUtilization() ?? 0
-        push(gpu, to: &gpuHistory)
+        cpuHistory.append(Float(cpu))
 
         memoryUsed = usedMemory()
-        push(memoryPercent, to: &memoryHistory)
+        memoryHistory.append(Float(memoryPercent))
         pressure = switch sysctlValue("kern.memorystatus_vm_pressure_level", Int32(1)) {
         case 4: "Critical"
         case 2: "Warning"
         default: "Normal"
-        }
-
-        // Free space asks the purgeable-space service, which is slow; disk barely moves anyway.
-        if times.count % 15 == 1, let v = try? URL(fileURLWithPath: "/").resourceValues(forKeys: [.volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey]) {
-            diskTotal = Int64(v.volumeTotalCapacity ?? 0)
-            diskFree = v.volumeAvailableCapacityForImportantUsage ?? 0
         }
 
         let net = networkBytes()
@@ -135,39 +176,54 @@ final class Monitor {
             up = Double(net.up &- last.up) / elapsed
         }
         lastNet = net
-        push(down, to: &downHistory)
-        push(up, to: &upHistory)
+        downHistory.append(Float(down))
+        upHistory.append(Float(up))
 
-        // CPU/GPU feed the popover and menu bar every tick; the ~200 other sensors only show in the dashboard.
-        let everyone = times.count % 5 == 1
-        sensors = sensors.map { sensor in
-            guard everyone || sensor.group == "CPU" || sensor.group == "GPU" else { return sensor }
-            var s = sensor
-            if let v = smc?.read(s.id), Self.plausibleTemp(v) { s.value = v }
-            push(s.value, to: &s.history)
-            return s
+        // Expensive readings refresh every tick while a view is open or the menu bar shows them,
+        // otherwise every 10 s (history holds the last value in between).
+        let watched = viewers > 0
+        let slowTick = tick % 5 == 1
+        let menuBar = UserDefaults.standard.string(forKey: MenuBarItem.storageKey) ?? MenuBarItem.defaults
+
+        if watched || slowTick { gpu = gpuUtilization() ?? 0 }
+        gpuHistory.append(Float(gpu))
+
+        // Free space asks the purgeable-space service, which is slow; disk barely moves anyway.
+        if tick % 15 == 1 || (watched && diskTotal == 0),
+           let v = try? URL(fileURLWithPath: "/").resourceValues(forKeys: [.volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey]) {
+            diskTotal = Int64(v.volumeTotalCapacity ?? 0)
+            diskFree = v.volumeAvailableCapacityForImportantUsage ?? 0
         }
+
+        let hotTemps = watched || slowTick || menuBar.contains("Temp")
+        var updated = sensors
+        sensors = [] // drop our reference so `updated` mutates in place instead of copying every history
+        for i in updated.indices {
+            let hot = updated[i].group == "CPU" || updated[i].group == "GPU"
+            guard hot ? hotTemps : slowTick else { continue }
+            if let v = smc?.read(updated[i].code), Self.plausibleTemp(v) { updated[i].value = v }
+            updated[i].history.append(Float(updated[i].value))
+        }
+        sensors = updated
         cpuTemp = average(of: "CPU")
         gpuTemp = average(of: "GPU")
-        push(cpuTemp ?? 0, to: &cpuTempHistory)
-        push(gpuTemp ?? 0, to: &gpuTempHistory)
+        cpuTempHistory.append(Float(cpuTemp ?? 0))
+        gpuTempHistory.append(Float(gpuTemp ?? 0))
 
-        let fanCount = Int(smc?.read("FNum") ?? 0)
-        fanRPMs = (0..<fanCount).compactMap { smc?.read("F\($0)Ac") }
-        fansAuto = (0..<fanCount).allSatisfy { (smc?.read("F\($0)Md") ?? 0) == 0 }
+        if watched || slowTick || menuBar.contains("fan") {
+            fanRPMs = fanKeys.compactMap { smc?.read($0.actual) }
+            fansAuto = fanKeys.allSatisfy { smc?.read($0.mode) != 1 } // 0 = auto, 3 = stopped by macOS at idle, 1 = forced
+        }
 
-        sampleApps(elapsed: elapsed)
+        // Only visible in views. Always scan once at launch so the first open has a CPU baseline.
+        if watched || tick == 1 { sampleApps() }
         uptime = now.timeIntervalSince1970 - Double(sysctlValue("kern.boottime", timeval()).tv_sec)
     }
 
-    private func push<T>(_ value: T, to history: inout [T]) {
-        history.append(value)
-        if history.count > Self.historyLength { history.removeFirst() }
-    }
-
     private func average(of group: String) -> Double? {
-        let temps = sensors.filter { $0.group == group }.map(\.value)
-        return temps.isEmpty ? nil : temps.reduce(0, +) / Double(temps.count)
+        var sum = 0.0, count = 0
+        for s in sensors where s.group == group { sum += s.value; count += 1 }
+        return count == 0 ? nil : sum / Double(count)
     }
 
     private func cpuTicks() -> (busy: UInt64, total: UInt64) {
@@ -201,13 +257,18 @@ final class Monitor {
         return pages * UInt64(vm_kernel_page_size)
     }
 
-    private func gpuUtilization() -> Double? {
+    private static func acceleratorEntries() -> [io_registry_entry_t] {
         var iter: io_iterator_t = 0
-        guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOAccelerator"), &iter) == KERN_SUCCESS else { return nil }
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOAccelerator"), &iter) == KERN_SUCCESS else { return [] }
         defer { IOObjectRelease(iter) }
+        var entries: [io_registry_entry_t] = []
+        while case let entry = IOIteratorNext(iter), entry != 0 { entries.append(entry) } // kept for the app's lifetime
+        return entries
+    }
+
+    private func gpuUtilization() -> Double? {
         var result: Double?
-        while case let entry = IOIteratorNext(iter), entry != 0 {
-            defer { IOObjectRelease(entry) }
+        for entry in gpuEntries {
             let stats = IORegistryEntryCreateCFProperty(entry, "PerformanceStatistics" as CFString, kCFAllocatorDefault, 0)?
                 .takeRetainedValue() as? [String: Any]
             if let util = stats?["Device Utilization %"] as? Int { result = max(result ?? 0, Double(util)) }
@@ -229,7 +290,12 @@ final class Monitor {
                 let hdr = raw.loadUnaligned(fromByteOffset: offset, as: if_msghdr.self)
                 if Int32(hdr.ifm_type) == RTM_IFINFO2 {
                     let h2 = raw.loadUnaligned(fromByteOffset: offset, as: if_msghdr2.self)
-                    if if_indextoname(UInt32(h2.ifm_index), &name) != nil, String(cString: name).hasPrefix("en") {
+                    let physical = physicalInterfaces[h2.ifm_index] ?? {
+                        let isEn = if_indextoname(UInt32(h2.ifm_index), &name) != nil && String(cString: name).hasPrefix("en")
+                        physicalInterfaces[h2.ifm_index] = isEn
+                        return isEn
+                    }()
+                    if physical {
                         down += h2.ifm_data.ifi_ibytes
                         up += h2.ifm_data.ifi_obytes
                     }
@@ -241,7 +307,10 @@ final class Monitor {
     }
 
     /// Sums every process into the app responsible for it (Safari + its web content processes, etc.).
-    private func sampleApps(elapsed: Double) {
+    private func sampleApps() {
+        let now = Date()
+        let elapsed = max(now.timeIntervalSince(lastAppsSample), 0.1)
+        lastAppsSample = now
         let running = Dictionary(NSWorkspace.shared.runningApplications
             .filter { $0.bundleURL?.pathExtension == "app" }
             .map { ($0.processIdentifier, $0) }, uniquingKeysWith: { a, _ in a })
@@ -259,12 +328,17 @@ final class Monitor {
             guard ok else { continue } // other users' / root processes
             let cpuTime = info.ri_user_time + info.ri_system_time
             nextCPU[pid] = cpuTime
-            let owner = responsiblePID?(pid) ?? pid
+            let owner = owners[pid] ?? {
+                let o = responsiblePID?(pid) ?? pid
+                owners[pid] = o
+                return o
+            }()
             guard running[owner] != nil else { continue }
             totals[owner, default: (0, 0)].memory += info.ri_phys_footprint
             totals[owner, default: (0, 0)].cpu += cpuTime &- (lastProcCPU[pid] ?? cpuTime)
         }
         lastProcCPU = nextCPU
+        owners = owners.filter { nextCPU[$0.key] != nil }
         icons = icons.filter { running[$0.key] != nil }
 
         apps = totals.sorted { $0.value.memory > $1.value.memory }.compactMap { pid, total in
