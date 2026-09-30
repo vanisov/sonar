@@ -6,10 +6,12 @@ struct SMCKeyData {
     struct Vers { var major: UInt8 = 0, minor: UInt8 = 0, build: UInt8 = 0, reserved: UInt8 = 0, release: UInt16 = 0 }
     struct PLimit { var version: UInt16 = 0, length: UInt16 = 0, cpu: UInt32 = 0, gpu: UInt32 = 0, mem: UInt32 = 0 }
     struct KeyInfo { var dataSize: UInt32 = 0, dataType: UInt32 = 0, dataAttributes: UInt8 = 0 }
-    typealias Bytes = (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
-                       UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
-                       UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
-                       UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+    typealias Bytes = (
+        UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+        UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+        UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+        UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8
+    )
 
     var key: UInt32 = 0
     var vers = Vers()
@@ -18,8 +20,10 @@ struct SMCKeyData {
     var padding: UInt16 = 0
     var result: UInt8 = 0, status: UInt8 = 0, data8: UInt8 = 0
     var data32: UInt32 = 0
-    var bytes: Bytes = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+    var bytes: Bytes = (
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    )
 }
 
 /// Read-only access to the System Management Controller (temperatures, fans).
@@ -46,12 +50,12 @@ final class SMC {
         if let cached = infoCache[input.key] {
             input.keyInfo = cached
         } else {
-            input.data8 = 9 // get key info
+            input.data8 = 9  // get key info
             guard let info = call(&input) else { return nil }
             input.keyInfo = info.keyInfo
             infoCache[input.key] = info.keyInfo
         }
-        input.data8 = 5 // read bytes
+        input.data8 = 5  // read bytes
         guard let out = call(&input) else { return nil }
         return Self.decode(out.bytes, type: Self.string(input.keyInfo.dataType), size: Int(input.keyInfo.dataSize))
     }
@@ -61,7 +65,7 @@ final class SMC {
         guard let count = read("#KEY") else { return [] }
         return (0..<Int(count)).compactMap { i in
             var input = SMCKeyData()
-            input.data8 = 8 // key at index
+            input.data8 = 8  // key at index
             input.data32 = UInt32(i)
             return call(&input).map { Self.string($0.key) }
         }
@@ -82,8 +86,8 @@ final class SMC {
         case ("ui8 ", 1): return Double(b[0])
         case ("ui16", 2): return Double(be16)
         case ("ui32", 4): return Double(b.reduce(UInt32(0)) { $0 << 8 | UInt32($1) })
-        case ("fpe2", 2): return Double(be16) / 4 // Intel fans
-        case ("sp78", 2): return Double(Int16(bitPattern: be16)) / 256 // Intel temps
+        case ("fpe2", 2): return Double(be16) / 4  // Intel fans
+        case ("sp78", 2): return Double(Int16(bitPattern: be16)) / 256  // Intel temps
         default: return nil
         }
     }

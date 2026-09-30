@@ -14,7 +14,7 @@ struct AppUsage: Identifiable {
 struct Ring<Element>: RandomAccessCollection {
     let capacity: Int
     private var storage: [Element] = []
-    private var head = 0 // oldest element once full
+    private var head = 0  // oldest element once full
 
     init(capacity: Int = Monitor.historyLength) {
         self.capacity = capacity
@@ -36,7 +36,7 @@ struct Ring<Element>: RandomAccessCollection {
 }
 
 struct Sensor: Identifiable {
-    let id: String // SMC key, e.g. "Tp01"
+    let id: String  // SMC key, e.g. "Tp01"
     let code: UInt32
     let group: String
     var value: Double
@@ -60,7 +60,7 @@ struct Sensor: Identifiable {
 
 @MainActor @Observable
 final class Monitor {
-    nonisolated static let historyLength = 1800 // 1 h at 2 s
+    nonisolated static let historyLength = 1800  // 1 h at 2 s
     static let interval: Duration = .seconds(2)
 
     // Every history grows in lockstep with `times`.
@@ -85,7 +85,7 @@ final class Monitor {
     var gpuTempHistory = Ring<Float>()
     var fanRPMs: [Double] = []
     var fansAuto = true
-    var apps: [AppUsage] = [] // sorted by memory
+    var apps: [AppUsage] = []  // sorted by memory
     var uptime: TimeInterval = 0
 
     let chip = sysctlString("machdep.cpu.brand_string").replacingOccurrences(of: "Apple ", with: "")
@@ -109,7 +109,7 @@ final class Monitor {
     @ObservationIgnored private var physicalInterfaces: [UInt16: Bool] = [:]
     @ObservationIgnored private var lastProcCPU: [pid_t: UInt64] = [:]
     @ObservationIgnored private var owners: [pid_t: pid_t] = [:]
-    @ObservationIgnored private var icons: [pid_t: NSImage] = [:] // NSRunningApplication.icon hits the disk every call
+    @ObservationIgnored private var icons: [pid_t: NSImage] = [:]  // NSRunningApplication.icon hits the disk every call
     @ObservationIgnored private var lastSample = Date()
     @ObservationIgnored private var lastAppsSample = Date()
     @ObservationIgnored private let tickToNanos: Double = {
@@ -139,7 +139,7 @@ final class Monitor {
 
     func viewAppeared() {
         viewers += 1
-        if viewers == 1 { sample() } // fresh numbers the moment something opens
+        if viewers == 1 { sample() }  // fresh numbers the moment something opens
     }
 
     func viewDisappeared() { viewers = max(viewers - 1, 0) }
@@ -164,11 +164,12 @@ final class Monitor {
 
         memoryUsed = usedMemory()
         memoryHistory.append(Float(memoryPercent))
-        pressure = switch sysctlValue("kern.memorystatus_vm_pressure_level", Int32(1)) {
-        case 4: "Critical"
-        case 2: "Warning"
-        default: "Normal"
-        }
+        pressure =
+            switch sysctlValue("kern.memorystatus_vm_pressure_level", Int32(1)) {
+            case 4: "Critical"
+            case 2: "Warning"
+            default: "Normal"
+            }
 
         let net = networkBytes()
         if let last = lastNet {
@@ -190,14 +191,17 @@ final class Monitor {
 
         // Free space asks the purgeable-space service, which is slow; disk barely moves anyway.
         if tick % 15 == 1 || (watched && diskTotal == 0),
-           let v = try? URL(fileURLWithPath: "/").resourceValues(forKeys: [.volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey]) {
+            let v = try? URL(fileURLWithPath: "/").resourceValues(forKeys: [
+                .volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey,
+            ])
+        {
             diskTotal = Int64(v.volumeTotalCapacity ?? 0)
             diskFree = v.volumeAvailableCapacityForImportantUsage ?? 0
         }
 
         let hotTemps = watched || slowTick || menuBar.contains("Temp")
         var updated = sensors
-        sensors = [] // drop our reference so `updated` mutates in place instead of copying every history
+        sensors = []  // drop our reference so `updated` mutates in place instead of copying every history
         for i in updated.indices {
             let hot = updated[i].group == "CPU" || updated[i].group == "GPU"
             guard hot ? hotTemps : slowTick else { continue }
@@ -212,7 +216,7 @@ final class Monitor {
 
         if watched || slowTick || menuBar.contains("fan") {
             fanRPMs = fanKeys.compactMap { smc?.read($0.actual) }
-            fansAuto = fanKeys.allSatisfy { smc?.read($0.mode) != 1 } // 0 = auto, 3 = stopped by macOS at idle, 1 = forced
+            fansAuto = fanKeys.allSatisfy { smc?.read($0.mode) != 1 }  // 0 = auto, 3 = stopped by macOS at idle, 1 = forced
         }
 
         // Only visible in views. Always scan once at launch so the first open has a CPU baseline.
@@ -231,7 +235,8 @@ final class Monitor {
         var info: processor_info_array_t?
         var infoCount: mach_msg_type_number_t = 0
         guard host_processor_info(mach_host_self(), PROCESSOR_CPU_LOAD_INFO, &count, &info, &infoCount) == KERN_SUCCESS,
-              let info else { return (0, 0) }
+            let info
+        else { return (0, 0) }
         defer { vm_deallocate(mach_task_self_, vm_address_t(bitPattern: info), vm_size_t(Int(infoCount) * MemoryLayout<integer_t>.stride)) }
         var busy: UInt64 = 0, total: UInt64 = 0
         for core in 0..<Int(count) {
@@ -249,10 +254,13 @@ final class Monitor {
         var stats = vm_statistics64()
         var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
         let kr = withUnsafeMutablePointer(to: &stats) {
-            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count) }
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+            }
         }
         guard kr == KERN_SUCCESS else { return 0 }
-        let pages = UInt64(stats.internal_page_count) - min(UInt64(stats.purgeable_count), UInt64(stats.internal_page_count))
+        let pages =
+            UInt64(stats.internal_page_count) - min(UInt64(stats.purgeable_count), UInt64(stats.internal_page_count))
             + UInt64(stats.wire_count) + UInt64(stats.compressor_page_count)
         return pages * UInt64(vm_kernel_page_size)
     }
@@ -262,14 +270,15 @@ final class Monitor {
         guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOAccelerator"), &iter) == KERN_SUCCESS else { return [] }
         defer { IOObjectRelease(iter) }
         var entries: [io_registry_entry_t] = []
-        while case let entry = IOIteratorNext(iter), entry != 0 { entries.append(entry) } // kept for the app's lifetime
+        while case let entry = IOIteratorNext(iter), entry != 0 { entries.append(entry) }  // kept for the app's lifetime
         return entries
     }
 
     private func gpuUtilization() -> Double? {
         var result: Double?
         for entry in gpuEntries {
-            let stats = IORegistryEntryCreateCFProperty(entry, "PerformanceStatistics" as CFString, kCFAllocatorDefault, 0)?
+            let stats =
+                IORegistryEntryCreateCFProperty(entry, "PerformanceStatistics" as CFString, kCFAllocatorDefault, 0)?
                 .takeRetainedValue() as? [String: Any]
             if let util = stats?["Device Utilization %"] as? Int { result = max(result ?? 0, Double(util)) }
         }
@@ -290,11 +299,13 @@ final class Monitor {
                 let hdr = raw.loadUnaligned(fromByteOffset: offset, as: if_msghdr.self)
                 if Int32(hdr.ifm_type) == RTM_IFINFO2 {
                     let h2 = raw.loadUnaligned(fromByteOffset: offset, as: if_msghdr2.self)
-                    let physical = physicalInterfaces[h2.ifm_index] ?? {
-                        let isEn = if_indextoname(UInt32(h2.ifm_index), &name) != nil && String(cString: name).hasPrefix("en")
-                        physicalInterfaces[h2.ifm_index] = isEn
-                        return isEn
-                    }()
+                    let physical =
+                        physicalInterfaces[h2.ifm_index]
+                        ?? {
+                            let isEn = if_indextoname(UInt32(h2.ifm_index), &name) != nil && String(cString: name).hasPrefix("en")
+                            physicalInterfaces[h2.ifm_index] = isEn
+                            return isEn
+                        }()
                     if physical {
                         down += h2.ifm_data.ifi_ibytes
                         up += h2.ifm_data.ifi_obytes
@@ -311,28 +322,32 @@ final class Monitor {
         let now = Date()
         let elapsed = max(now.timeIntervalSince(lastAppsSample), 0.1)
         lastAppsSample = now
-        let running = Dictionary(NSWorkspace.shared.runningApplications
-            .filter { $0.bundleURL?.pathExtension == "app" }
-            .map { ($0.processIdentifier, $0) }, uniquingKeysWith: { a, _ in a })
+        let running = Dictionary(
+            NSWorkspace.shared.runningApplications
+                .filter { $0.bundleURL?.pathExtension == "app" }
+                .map { ($0.processIdentifier, $0) }, uniquingKeysWith: { a, _ in a })
 
-        var pids = [pid_t](repeating: 0, count: 4096) // ponytail: fixed cap, grow if someone runs >4k processes
+        var pids = [pid_t](repeating: 0, count: 4096)  // ponytail: fixed cap, grow if someone runs >4k processes
         let n = Int(proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size)))
         var totals: [pid_t: (memory: UInt64, cpu: UInt64)] = [:]
         var nextCPU: [pid_t: UInt64] = [:]
 
         for pid in pids.prefix(max(n, 0)) where pid > 0 {
             var info = rusage_info_v2()
-            let ok = withUnsafeMutablePointer(to: &info) {
-                $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V2, $0) }
-            } == 0
-            guard ok else { continue } // other users' / root processes
+            let ok =
+                withUnsafeMutablePointer(to: &info) {
+                    $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V2, $0) }
+                } == 0
+            guard ok else { continue }  // other users' / root processes
             let cpuTime = info.ri_user_time + info.ri_system_time
             nextCPU[pid] = cpuTime
-            let owner = owners[pid] ?? {
-                let o = responsiblePID?(pid) ?? pid
-                owners[pid] = o
-                return o
-            }()
+            let owner =
+                owners[pid]
+                ?? {
+                    let o = responsiblePID?(pid) ?? pid
+                    owners[pid] = o
+                    return o
+                }()
             guard running[owner] != nil else { continue }
             totals[owner, default: (0, 0)].memory += info.ri_phys_footprint
             totals[owner, default: (0, 0)].cpu += cpuTime &- (lastProcCPU[pid] ?? cpuTime)
@@ -345,15 +360,17 @@ final class Monitor {
             guard let app = running[pid] else { return nil }
             let seconds = Double(total.cpu) * tickToNanos / 1e9
             if icons[pid] == nil { icons[pid] = app.icon }
-            return AppUsage(id: pid, name: app.localizedName ?? "Unknown", icon: icons[pid],
-                            memory: total.memory, cpu: seconds / (elapsed * Double(cores)) * 100)
+            return AppUsage(
+                id: pid, name: app.localizedName ?? "Unknown", icon: icons[pid],
+                memory: total.memory, cpu: seconds / (elapsed * Double(cores)) * 100)
         }
     }
 }
 
 /// Private libSystem call Activity Monitor-style tools use to group helper processes under their app.
 private let responsiblePID: ((pid_t) -> pid_t)? = {
-    guard let sym = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "responsibility_get_pid_responsible_for_pid") else { return nil } // -2 = RTLD_DEFAULT
+    let rtldDefault = UnsafeMutableRawPointer(bitPattern: -2)
+    guard let sym = dlsym(rtldDefault, "responsibility_get_pid_responsible_for_pid") else { return nil }
     let fn = unsafeBitCast(sym, to: (@convention(c) (pid_t) -> pid_t).self)
     return { fn($0) }
 }()

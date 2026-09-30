@@ -3,10 +3,10 @@ import SwiftUI
 @main
 struct SonarApp: App {
     @State private var monitor = Monitor()
-    @State private var showingSettings = false // lives here: MenuBarExtra rebuilds its content whenever the label changes
+    @State private var showingSettings = false  // lives here: MenuBarExtra rebuilds its content whenever the label changes
 
     init() {
-        NSApplication.shared.setActivationPolicy(.accessory) // no Dock icon when run via `swift run`
+        NSApplication.shared.setActivationPolicy(.accessory)  // no Dock icon when run via `swift run`
         if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLine.arguments.count {
             snapshot(to: CommandLine.arguments[i + 1])
         }
@@ -26,15 +26,20 @@ struct SonarApp: App {
         let monitor = monitor
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(5))
-            let renderer = ImageRenderer(content: PanelView(monitor: monitor, showingSettings: .constant(false))
-                .background(Color(white: 0.13))
-                .environment(\.colorScheme, .dark))
+            let renderer = ImageRenderer(
+                content: PanelView(monitor: monitor, showingSettings: .constant(false))
+                    .background(Color(white: 0.13))
+                    .environment(\.colorScheme, .dark))
             renderer.scale = 2
-            if let tiff = renderer.nsImage?.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+            if let tiff = renderer.nsImage?.tiffRepresentation,
+                let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
+            {
                 try? png.write(to: URL(fileURLWithPath: path))
             }
             print("sensors:", monitor.sensors.map { "\($0.id)=\(Int($0.value))" }.joined(separator: " "))
-            print("fans:", monitor.fanRPMs, "gpu:", monitor.gpu, "apps:", monitor.apps.count, "cpuTemp:", monitor.cpuTemp ?? 0, "gpuTemp:", monitor.gpuTemp ?? 0)
+            print(
+                "fans:", monitor.fanRPMs, "gpu:", monitor.gpu, "apps:", monitor.apps.count, "cpuTemp:", monitor.cpuTemp ?? 0, "gpuTemp:",
+                monitor.gpuTemp ?? 0)
             exit(0)
         }
     }

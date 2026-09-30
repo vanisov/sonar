@@ -1,5 +1,4 @@
-#!/usr/bin/env swift
-// Renders the app icon and builds Icon/Sonar.icns.
+#!/usr/bin/env swift  // Renders the app icon and builds Icon/Sonar.icns.
 // Run: ./Icon/make-icon.swift   (needs Xcode's toolchain: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer)
 import AppKit
 import SwiftUI
@@ -15,8 +14,12 @@ struct Pulse: Shape {
         var p = Path()
         p.move(to: CGPoint(x: x0, y: y))
         p.addLine(to: CGPoint(x: x - half, y: y))
-        p.addCurve(to: CGPoint(x: x, y: y - height), control1: CGPoint(x: x - half * 0.45, y: y), control2: CGPoint(x: x - half * 0.42, y: y - height))
-        p.addCurve(to: CGPoint(x: x + half, y: y), control1: CGPoint(x: x + half * 0.42, y: y - height), control2: CGPoint(x: x + half * 0.45, y: y))
+        p.addCurve(
+            to: CGPoint(x: x, y: y - height), control1: CGPoint(x: x - half * 0.45, y: y),
+            control2: CGPoint(x: x - half * 0.42, y: y - height))
+        p.addCurve(
+            to: CGPoint(x: x + half, y: y), control1: CGPoint(x: x + half * 0.42, y: y - height),
+            control2: CGPoint(x: x + half * 0.45, y: y))
         p.addLine(to: CGPoint(x: x0 + width, y: y))
         return p
     }
@@ -44,7 +47,8 @@ try! FileManager.default.createDirectory(at: iconset, withIntermediateDirectorie
 MainActor.assumeIsolated {
     for size in [16, 32, 128, 256, 512] {
         for scale in [1, 2] {
-            let renderer = ImageRenderer(content: Icon().scaleEffect(CGFloat(size) / 1024).frame(width: CGFloat(size), height: CGFloat(size)))
+            let renderer = ImageRenderer(
+                content: Icon().scaleEffect(CGFloat(size) / 1024).frame(width: CGFloat(size), height: CGFloat(size)))
             renderer.scale = CGFloat(scale)
             let png = NSBitmapImageRep(data: renderer.nsImage!.tiffRepresentation!)!.representation(using: .png, properties: [:])!
             let name = scale == 1 ? "icon_\(size)x\(size).png" : "icon_\(size)x\(size)@2x.png"

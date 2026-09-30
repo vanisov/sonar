@@ -16,9 +16,10 @@ struct PanelView: View {
             } else if showingSettings {
                 SettingsView { showingSettings = false }
             } else {
-                panel.background(GeometryReader { g in
-                    Color.clear.onAppear { size = g.size }.onChange(of: g.size) { _, new in size = new }
-                })
+                panel.background(
+                    GeometryReader { g in
+                        Color.clear.onAppear { size = g.size }.onChange(of: g.size) { _, new in size = new }
+                    })
             }
         }
         .onAppear {
@@ -40,9 +41,15 @@ struct PanelView: View {
                 Chip(text: monitor.osVersion)
             }
             Grid(horizontalSpacing: 10, verticalSpacing: 10) {
-                GridRow { cpu; gpu }
-                GridRow { memory; disk }
-                GridRow { network; fans }
+                GridRow {
+                    cpu; gpu
+                }
+                GridRow {
+                    memory; disk
+                }
+                GridRow {
+                    network; fans
+                }
             }
             TopAppsCard(apps: Array(monitor.apps.prefix(5)))
             footer
@@ -75,25 +82,31 @@ struct PanelView: View {
     }
 
     private var cpu: some View {
-        MetricCard(title: "CPU", symbol: "cpu", tint: .blue, badge: Self.temp(monitor.cpuTemp),
-                   value: monitor.cpu.formatted(.number.precision(.fractionLength(1))), unit: "%",
-                   footer: "\(monitor.cores) logical cores · 2 min") {
+        MetricCard(
+            title: "CPU", symbol: "cpu", tint: .blue, badge: Self.temp(monitor.cpuTemp),
+            value: monitor.cpu.formatted(.number.precision(.fractionLength(1))), unit: "%",
+            footer: "\(monitor.cores) logical cores · 2 min"
+        ) {
             Sparkline(values: monitor.cpuHistory, tint: .blue)
         }
     }
 
     private var gpu: some View {
-        MetricCard(title: "GPU", symbol: "square.stack.3d.up", tint: .pink, badge: Self.temp(monitor.gpuTemp),
-                   value: "\(Int(monitor.gpu))", unit: "%", footer: "Device activity · 2 min") {
+        MetricCard(
+            title: "GPU", symbol: "square.stack.3d.up", tint: .pink, badge: Self.temp(monitor.gpuTemp),
+            value: "\(Int(monitor.gpu))", unit: "%", footer: "Device activity · 2 min"
+        ) {
             Sparkline(values: monitor.gpuHistory, tint: .pink)
         }
     }
 
     private var memory: some View {
         let pct = Double(monitor.memoryUsed) / Double(monitor.memoryTotal) * 100
-        return MetricCard(title: "Memory", symbol: "memorychip", tint: .purple, badge: monitor.pressure,
-                          value: pct.formatted(.number.precision(.fractionLength(1))), unit: "%",
-                          footer: "\(Self.bytes(monitor.memoryUsed, .memory)) / \(Self.bytes(monitor.memoryTotal, .memory))") {
+        return MetricCard(
+            title: "Memory", symbol: "memorychip", tint: .purple, badge: monitor.pressure,
+            value: pct.formatted(.number.precision(.fractionLength(1))), unit: "%",
+            footer: "\(Self.bytes(monitor.memoryUsed, .memory)) / \(Self.bytes(monitor.memoryTotal, .memory))"
+        ) {
             Sparkline(values: monitor.memoryHistory, tint: .purple)
         }
     }
@@ -102,9 +115,11 @@ struct PanelView: View {
         let used = monitor.diskTotal - monitor.diskFree
         let fraction = monitor.diskTotal > 0 ? Double(used) / Double(monitor.diskTotal) : 0
         let (value, unit) = Self.split(Self.bytes(monitor.diskFree, .file))
-        return MetricCard(title: "Disk", symbol: "internaldrive", tint: .orange, badge: Self.bytes(monitor.diskTotal, .file),
-                          value: value, unit: "\(unit) free",
-                          footer: "\(Self.bytes(used, .file)) used · \(Int(fraction * 100))%") {
+        return MetricCard(
+            title: "Disk", symbol: "internaldrive", tint: .orange, badge: Self.bytes(monitor.diskTotal, .file),
+            value: value, unit: "\(unit) free",
+            footer: "\(Self.bytes(used, .file)) used · \(Int(fraction * 100))%"
+        ) {
             GeometryReader { g in
                 ZStack(alignment: .leading) {
                     Capsule().fill(.primary.opacity(0.08))
@@ -117,19 +132,23 @@ struct PanelView: View {
 
     private var network: some View {
         let (value, unit) = Self.split(Self.bytes(monitor.down, .file))
-        return MetricCard(title: "Network", symbol: "network", tint: .green, badge: "↓ / ↑",
-                          value: value, unit: "\(unit)/s",
-                          footer: "↓ Download · ↑ \(Self.bytes(monitor.up, .file))/s") {
+        return MetricCard(
+            title: "Network", symbol: "network", tint: .green, badge: "↓ / ↑",
+            value: value, unit: "\(unit)/s",
+            footer: "↓ Download · ↑ \(Self.bytes(monitor.up, .file))/s"
+        ) {
             Sparkline(values: monitor.downHistory, tint: .green, maxValue: nil)
         }
     }
 
     private var fans: some View {
         let fastest = monitor.fanRPMs.max()
-        return MetricCard(title: "Fans", symbol: "fan", tint: .teal,
-                          badge: fastest == nil ? nil : (monitor.fansAuto ? "Auto" : "Manual"),
-                          value: fastest.map { "\(Int($0))" } ?? "—", unit: fastest == nil ? "" : "RPM",
-                          footer: fastest == nil ? "No fans found" : "Fastest of \(monitor.fanRPMs.count) fan\(monitor.fanRPMs.count == 1 ? "" : "s")") {
+        return MetricCard(
+            title: "Fans", symbol: "fan", tint: .teal,
+            badge: fastest == nil ? nil : (monitor.fansAuto ? "Auto" : "Manual"),
+            value: fastest.map { "\(Int($0))" } ?? "—", unit: fastest == nil ? "" : "RPM",
+            footer: fastest == nil ? "No fans found" : "Fastest of \(monitor.fanRPMs.count) fan\(monitor.fanRPMs.count == 1 ? "" : "s")"
+        ) {
             Text(fastest == nil ? "Passively cooled" : monitor.fansAuto ? "Managed by macOS" : "Manually controlled")
                 .font(.system(size: 11)).foregroundStyle(.secondary)
         }
@@ -138,17 +157,25 @@ struct PanelView: View {
     private var footer: some View {
         HStack {
             Button {
-                dismiss() // a new key window doesn't close the popover on its own
+                dismiss()  // a new key window doesn't close the popover on its own
                 DashboardWindow.show(monitor)
             } label: {
                 Label("Open dashboard", systemImage: "square.grid.2x2")
             }
             Spacer()
-            Button { showingSettings = true } label: { Image(systemName: "slider.horizontal.3") }
-                .help("Settings")
-                .padding(.trailing, 8)
-            Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }
-                .help("Quit Sonar")
+            Button {
+                showingSettings = true
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+            }
+            .help("Settings")
+            .padding(.trailing, 8)
+            Button {
+                NSApp.terminate(nil)
+            } label: {
+                Image(systemName: "power")
+            }
+            .help("Quit Sonar")
         }
         .buttonStyle(.plain)
         .font(.system(size: 12, weight: .medium))
@@ -244,7 +271,7 @@ private struct MetricCard<Visual: View>: View {
 struct Sparkline: View {
     let values: Ring<Float>, tint: Color
     var maxValue: Float? = 100
-    var window = 60 // samples shown: 2 min
+    var window = 60  // samples shown: 2 min
 
     var body: some View {
         let shown = Array(values.suffix(window))
@@ -263,9 +290,9 @@ private struct SparklineShape: Shape {
 
     func path(in rect: CGRect) -> Path {
         guard values.count > 1 else { return Path() }
-        let r = rect.insetBy(dx: 0, dy: 1) // keep the stroke inside at 0% and 100%
+        let r = rect.insetBy(dx: 0, dy: 1)  // keep the stroke inside at 0% and 100%
         let step = r.width / CGFloat(window - 1)
-        let x0 = r.minX + CGFloat(window - values.count) * step // right-aligned: fresh history grows in from the right
+        let x0 = r.minX + CGFloat(window - values.count) * step  // right-aligned: fresh history grows in from the right
         let points = values.enumerated().map { i, v in
             CGPoint(x: x0 + CGFloat(i) * step, y: r.maxY - CGFloat(min(max(v / top, 0), 1)) * r.height)
         }
@@ -321,6 +348,8 @@ private struct TopAppsCard: View {
 private struct TintedIcon: LabelStyle {
     let tint: Color
     func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 6) { configuration.icon.foregroundStyle(tint); configuration.title }
+        HStack(spacing: 6) {
+            configuration.icon.foregroundStyle(tint); configuration.title
+        }
     }
 }

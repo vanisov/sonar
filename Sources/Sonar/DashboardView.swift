@@ -9,7 +9,7 @@ import SwiftUI
     static func show(_ monitor: Monitor) {
         if window == nil {
             let host = NSHostingController(rootView: DashboardView(monitor: monitor))
-            host.sceneBridgingOptions = .all // lets the split view install its sidebar toolbar
+            host.sceneBridgingOptions = .all  // lets the split view install its sidebar toolbar
             let w = NSWindow(contentViewController: host)
             w.title = "Sonar"
             w.styleMask.insert(.fullSizeContentView)
@@ -73,22 +73,28 @@ private struct OverviewView: View {
         let m = monitor
         ScrollView {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible())], spacing: 14) {
-                HistoryCard(title: "CPU", symbol: "cpu", value: percent(m.cpu), times: m.times,
-                            series: [("CPU", m.cpuHistory, .blue)], domain: 0...100, axis: percent)
-                HistoryCard(title: "GPU", symbol: "square.stack.3d.up", value: percent(m.gpu), times: m.times,
-                            series: [("GPU", m.gpuHistory, .pink)], domain: 0...100, axis: percent)
-                HistoryCard(title: "Memory", symbol: "memorychip", value: percent(m.memoryPercent), times: m.times,
-                            series: [("Memory", m.memoryHistory, .purple)], domain: 0...100, axis: percent)
-                HistoryCard(title: "Network", symbol: "network",
-                            value: "↓ \(rate(m.down))  ↑ \(rate(m.up))", times: m.times,
-                            series: [("Download", m.downHistory, .green), ("Upload", m.upHistory, .teal)], axis: rate)
+                HistoryCard(
+                    title: "CPU", symbol: "cpu", value: percent(m.cpu), times: m.times,
+                    series: [("CPU", m.cpuHistory, .blue)], domain: 0...100, axis: percent)
+                HistoryCard(
+                    title: "GPU", symbol: "square.stack.3d.up", value: percent(m.gpu), times: m.times,
+                    series: [("GPU", m.gpuHistory, .pink)], domain: 0...100, axis: percent)
+                HistoryCard(
+                    title: "Memory", symbol: "memorychip", value: percent(m.memoryPercent), times: m.times,
+                    series: [("Memory", m.memoryHistory, .purple)], domain: 0...100, axis: percent)
+                HistoryCard(
+                    title: "Network", symbol: "network",
+                    value: "↓ \(rate(m.down))  ↑ \(rate(m.up))", times: m.times,
+                    series: [("Download", m.downHistory, .green), ("Upload", m.upHistory, .teal)], axis: rate)
                 if let t = m.cpuTemp {
-                    HistoryCard(title: "CPU temperature", symbol: "thermometer.medium", value: degrees(t), times: m.times,
-                                series: [("CPU", m.cpuTempHistory, .orange)], axis: degrees)
+                    HistoryCard(
+                        title: "CPU temperature", symbol: "thermometer.medium", value: degrees(t), times: m.times,
+                        series: [("CPU", m.cpuTempHistory, .orange)], axis: degrees)
                 }
                 if let t = m.gpuTemp {
-                    HistoryCard(title: "GPU temperature", symbol: "thermometer.medium", value: degrees(t), times: m.times,
-                                series: [("GPU", m.gpuTempHistory, .red)], axis: degrees)
+                    HistoryCard(
+                        title: "GPU temperature", symbol: "thermometer.medium", value: degrees(t), times: m.times,
+                        series: [("GPU", m.gpuTempHistory, .red)], axis: degrees)
                 }
             }
             .padding(20)
@@ -123,7 +129,9 @@ private struct HistoryCard: View {
                             .lineStyle(StrokeStyle(lineWidth: 1.5))
                         if series.count == 1 {
                             AreaMark(x: .value("Time", times[i]), y: .value("Value", s.values[i]))
-                                .foregroundStyle(LinearGradient(colors: [s.color.opacity(0.25), s.color.opacity(0)], startPoint: .top, endPoint: .bottom))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [s.color.opacity(0.25), s.color.opacity(0)], startPoint: .top, endPoint: .bottom))
                         }
                     }
                 }
