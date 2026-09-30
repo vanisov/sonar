@@ -24,6 +24,8 @@
 
 **your mac, at a glance.** a tiny, native menu bar monitor for Apple silicon.
 
+**why sonar?** there are plenty of system monitors for the Mac, but few are open source, and none were quite what I wanted. sonar didn't need to exist. I built it because I wanted to craft something modern, sleek and beautiful that's still lightweight and absolutely functional. this is just the start: I have lots of ideas for growing it into a one-stop shop for your Mac.
+
 ## features
 
 - **everything in one glance** — CPU, GPU, memory, disk, network, fans and your hungriest apps, in one panel that feels like it shipped with macOS.
