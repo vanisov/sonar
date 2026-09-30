@@ -8,6 +8,8 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-09-30
+
 ### Changed
 - The "sonar" wordmark in the dashboard sidebar is easier to read in light and dark mode.
 
@@ -85,7 +87,8 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 - Choice of stats in the menu bar, and launch at login.
 - Dashboard with an hour of history, every temperature sensor, and all running apps.
 
-[Unreleased]: https://github.com/vanisov/sonar/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/vanisov/sonar/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/vanisov/sonar/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/vanisov/sonar/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/vanisov/sonar/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/vanisov/sonar/compare/v1.2.0...v1.2.1
