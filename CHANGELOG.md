@@ -8,6 +8,14 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-09-30
+
+### Changed
+- The dashboard sidebar uses standard macOS rows: accent-colored icons, live values as badges, a slightly smaller
+  row size, more space under the logo, and more room after the Overview chevron.
+- CPU core bars and usage bars glide to each new value. The animation runs in the window server, so it costs
+  Sonar almost nothing.
+
 ## [1.3.0] - 2026-09-30
 
 ### Added
@@ -74,7 +82,8 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 - Choice of stats in the menu bar, and launch at login.
 - Dashboard with an hour of history, every temperature sensor, and all running apps.
 
-[Unreleased]: https://github.com/vanisov/sonar/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/vanisov/sonar/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/vanisov/sonar/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/vanisov/sonar/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/vanisov/sonar/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/vanisov/sonar/compare/v1.1.0...v1.2.0
