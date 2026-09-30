@@ -6,8 +6,10 @@ import SwiftUI
 @MainActor enum DashboardWindow {
     private static var window: NSWindow?
 
-    static func show(_ monitor: Monitor) {
+    static func show(_ monitor: Monitor, section: DashboardView.Section? = nil) {
+        if let section { DashboardNavigation.shared.section = section }
         if window == nil {
+            NSApp.setActivationPolicy(.regular)  // show in the Dock while the dashboard is open
             let host = NSHostingController(rootView: DashboardView(monitor: monitor))
             host.sceneBridgingOptions = .all  // lets the split view install its sidebar toolbar
             let w = NSWindow(contentViewController: host)
@@ -21,6 +23,7 @@ import SwiftUI
                     // AppKit can keep a closed window around; detach the SwiftUI tree so it stops updating.
                     (note.object as? NSWindow)?.contentViewController = nil
                     window = nil
+                    NSApp.setActivationPolicy(.accessory)
                 }
             }
             window = w
@@ -30,9 +33,15 @@ import SwiftUI
     }
 }
 
+/// Which section the dashboard shows; the panel's cards set it before opening the window.
+@MainActor @Observable final class DashboardNavigation {
+    static let shared = DashboardNavigation()
+    var section: DashboardView.Section? = .overview
+}
+
 struct DashboardView: View {
     let monitor: Monitor
-    @State private var section: Section? = .overview
+    @Bindable private var navigation = DashboardNavigation.shared
 
     enum Section: String, CaseIterable, Identifiable {
         case overview = "Overview", sensors = "Sensors", apps = "Apps"
@@ -48,12 +57,12 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(Section.allCases, selection: $section) { s in
+            List(Section.allCases, selection: $navigation.section) { s in
                 Label(s.rawValue, systemImage: s.symbol).tag(s)
             }
             .navigationSplitViewColumnWidth(180)
         } detail: {
-            switch section ?? .overview {
+            switch navigation.section ?? .overview {
             case .overview: OverviewView(monitor: monitor)
             case .sensors: SensorsView(sensors: monitor.sensors)
             case .apps: AppsTable(apps: monitor.apps)
@@ -68,6 +77,7 @@ struct DashboardView: View {
 
 private struct OverviewView: View {
     let monitor: Monitor
+    @AppStorage(TemperatureUnit.storageKey) private var unit = TemperatureUnit.system.rawValue  // redraw on change
 
     var body: some View {
         let m = monitor
@@ -104,7 +114,7 @@ private struct OverviewView: View {
 
     private func percent(_ v: Double) -> String { "\(Int(v.rounded()))%" }
     private func rate(_ v: Double) -> String { "\(PanelView.bytes(v, .file))/s" }
-    private func degrees(_ v: Double) -> String { "\(Int(v.rounded())) °C" }
+    private func degrees(_ v: Double) -> String { TemperatureUnit.format(v) }
 }
 
 private struct HistoryCard: View {
@@ -160,6 +170,7 @@ private struct HistoryCard: View {
 
 private struct SensorsView: View {
     let sensors: [Sensor]
+    @AppStorage(TemperatureUnit.storageKey) private var unit = TemperatureUnit.system.rawValue  // redraw on change
 
     var body: some View {
         List {
@@ -174,7 +185,7 @@ private struct SensorsView: View {
                                 Spacer()
                                 Sparkline(values: sensor.history, tint: .orange, maxValue: nil, window: 150)
                                     .frame(width: 140, height: 20)
-                                Text("\(sensor.value.formatted(.number.precision(.fractionLength(1)))) °C")
+                                Text(TemperatureUnit.format(sensor.value, decimals: 1))
                                     .monospacedDigit()
                                     .frame(width: 70, alignment: .trailing)
                             }

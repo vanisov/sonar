@@ -1,9 +1,28 @@
 import ServiceManagement
 import SwiftUI
 
+enum TemperatureUnit: String {
+    case celsius = "C", fahrenheit = "F"
+
+    static let storageKey = "temperatureUnit"
+    static var system: TemperatureUnit { Locale.current.measurementSystem == .us ? .fahrenheit : .celsius }
+    static var current: TemperatureUnit {
+        UserDefaults.standard.string(forKey: storageKey).flatMap(TemperatureUnit.init) ?? system
+    }
+
+    /// Sensors report Celsius; convert for display.
+    static func convert(_ celsius: Double) -> Double { current == .celsius ? celsius : celsius * 9 / 5 + 32 }
+
+    /// "58 °C" / "136 °F"
+    static func format(_ celsius: Double, decimals: Int = 0) -> String {
+        "\(convert(celsius).formatted(.number.precision(.fractionLength(decimals)))) °\(current.rawValue)"
+    }
+}
+
 struct SettingsView: View {
     let done: () -> Void
     @AppStorage(MenuBarItem.storageKey) private var items = MenuBarItem.defaults
+    @AppStorage(TemperatureUnit.storageKey) private var unit = TemperatureUnit.system.rawValue
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
 
@@ -11,8 +30,8 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 Button(action: done) { Image(systemName: "chevron.left").font(.system(size: 13, weight: .semibold)) }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                    .buttonStyle(HoverButtonStyle())
+                    .padding(.leading, -8)
                 Text("Settings").font(.system(size: 16, weight: .bold, design: .rounded))
             }
 
@@ -26,6 +45,17 @@ struct SettingsView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("General").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                HStack {
+                    Text("Temperature")
+                    Spacer()
+                    Picker("Temperature", selection: $unit) {
+                        Text("°C").tag(TemperatureUnit.celsius.rawValue)
+                        Text("°F").tag(TemperatureUnit.fahrenheit.rawValue)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                }
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in setLaunchAtLogin(on) }
                 if let loginError {

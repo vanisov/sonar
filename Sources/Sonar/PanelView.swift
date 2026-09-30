@@ -4,19 +4,27 @@ struct PanelView: View {
     let monitor: Monitor
     @Binding var showingSettings: Bool
     @State private var visible = false
-    @State private var size = CGSize(width: 380, height: 794)
+    @State private var size = CGSize(width: 380, height: 740)
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         Group {
             // MenuBarExtra keeps a closed popover alive offscreen. Rendering nothing while closed stops it
-            // observing Monitor; otherwise every sample re-rendered it and the digit animations never settled (~20% CPU).
+            // observing Monitor; otherwise every sample re-rendered it and animations never settled (~20% CPU).
             if !visible {
                 Color.clear.frame(width: size.width, height: size.height)
             } else if showingSettings {
                 SettingsView { showingSettings = false }
             } else {
-                panel.background(
+                PanelContent(
+                    monitor: monitor,
+                    openDashboard: { section in
+                        dismiss()  // a new key window doesn't close the popover on its own
+                        DashboardWindow.show(monitor, section: section)
+                    },
+                    openSettings: { showingSettings = true }
+                )
+                .background(
                     GeometryReader { g in
                         Color.clear.onAppear { size = g.size }.onChange(of: g.size) { _, new in size = new }
                     })
@@ -31,10 +39,16 @@ struct PanelView: View {
             monitor.viewDisappeared()
         }
     }
+}
 
-    private var panel: some View {
+/// The panel itself, without the visibility handling (also used by `--snapshot`).
+struct PanelContent: View {
+    let monitor: Monitor
+    var openDashboard: (DashboardView.Section) -> Void = { _ in }
+    var openSettings: () -> Void = {}
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            header
             HStack(spacing: 6) {
                 Chip(text: monitor.chip)
                 Chip(text: Int64(monitor.memoryTotal).formatted(.byteCount(style: .memory)))
@@ -42,48 +56,37 @@ struct PanelView: View {
             }
             Grid(horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
-                    cpu; gpu
+                    card(.overview) { cpu }
+                    card(.overview) { gpu }
                 }
                 GridRow {
-                    memory; disk
+                    card(.overview) { memory }
+                    card(.overview) { disk }
                 }
                 GridRow {
-                    network; fans
+                    card(.overview) { network }
+                    card(.sensors) { fans }
                 }
             }
-            TopAppsCard(apps: Array(monitor.apps.prefix(5)))
+            card(.apps) { TopAppsCard(apps: Array(monitor.apps.prefix(5))) }
             footer
         }
         .padding(16)
         .frame(width: 380)
     }
 
-    private var header: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "dot.radiowaves.left.and.right")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(LinearGradient(colors: [.cyan, .teal], startPoint: .top, endPoint: .bottom))
-                .frame(width: 34, height: 34)
-                .background(.teal.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Sonar").font(.system(size: 16, weight: .bold, design: .rounded))
-                Text("Your Mac, at a glance").font(.system(size: 11)).foregroundStyle(.secondary)
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 3) {
-                HStack(spacing: 4) {
-                    Circle().frame(width: 6, height: 6)
-                    Text("LIVE").font(.system(size: 9, weight: .bold)).tracking(0.6)
-                }
-                .foregroundStyle(.green)
-                Text("Up \(Self.duration(monitor.uptime))").font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
-            }
+    private func card(_ section: DashboardView.Section, @ViewBuilder content: () -> some View) -> some View {
+        Button {
+            openDashboard(section)
+        } label: {
+            content()
         }
+        .buttonStyle(CardButtonStyle())
     }
 
     private var cpu: some View {
         MetricCard(
-            title: "CPU", symbol: "cpu", tint: .blue, badge: Self.temp(monitor.cpuTemp),
+            title: "CPU", symbol: "cpu", tint: .blue, badge: monitor.cpuTemp.map { TemperatureUnit.format($0) },
             value: monitor.cpu.formatted(.number.precision(.fractionLength(1))), unit: "%",
             footer: "\(monitor.cores) logical cores · 2 min"
         ) {
@@ -93,7 +96,7 @@ struct PanelView: View {
 
     private var gpu: some View {
         MetricCard(
-            title: "GPU", symbol: "square.stack.3d.up", tint: .pink, badge: Self.temp(monitor.gpuTemp),
+            title: "GPU", symbol: "square.stack.3d.up", tint: .pink, badge: monitor.gpuTemp.map { TemperatureUnit.format($0) },
             value: "\(Int(monitor.gpu))", unit: "%", footer: "Device activity · 2 min"
         ) {
             Sparkline(values: monitor.gpuHistory, tint: .pink)
@@ -101,11 +104,10 @@ struct PanelView: View {
     }
 
     private var memory: some View {
-        let pct = Double(monitor.memoryUsed) / Double(monitor.memoryTotal) * 100
-        return MetricCard(
+        MetricCard(
             title: "Memory", symbol: "memorychip", tint: .purple, badge: monitor.pressure,
-            value: pct.formatted(.number.precision(.fractionLength(1))), unit: "%",
-            footer: "\(Self.bytes(monitor.memoryUsed, .memory)) / \(Self.bytes(monitor.memoryTotal, .memory))"
+            value: monitor.memoryPercent.formatted(.number.precision(.fractionLength(1))), unit: "%",
+            footer: "\(PanelView.bytes(monitor.memoryUsed, .memory)) / \(PanelView.bytes(monitor.memoryTotal, .memory))"
         ) {
             Sparkline(values: monitor.memoryHistory, tint: .purple)
         }
@@ -114,11 +116,11 @@ struct PanelView: View {
     private var disk: some View {
         let used = monitor.diskTotal - monitor.diskFree
         let fraction = monitor.diskTotal > 0 ? Double(used) / Double(monitor.diskTotal) : 0
-        let (value, unit) = Self.split(Self.bytes(monitor.diskFree, .file))
+        let (value, unit) = PanelView.split(PanelView.bytes(monitor.diskFree, .file))
         return MetricCard(
-            title: "Disk", symbol: "internaldrive", tint: .orange, badge: Self.bytes(monitor.diskTotal, .file),
+            title: "Disk", symbol: "internaldrive", tint: .orange, badge: PanelView.bytes(monitor.diskTotal, .file),
             value: value, unit: "\(unit) free",
-            footer: "\(Self.bytes(used, .file)) used · \(Int(fraction * 100))%"
+            footer: "\(PanelView.bytes(used, .file)) used · \(Int(fraction * 100))%"
         ) {
             GeometryReader { g in
                 ZStack(alignment: .leading) {
@@ -131,11 +133,11 @@ struct PanelView: View {
     }
 
     private var network: some View {
-        let (value, unit) = Self.split(Self.bytes(monitor.down, .file))
+        let (value, unit) = PanelView.split(PanelView.bytes(monitor.down, .file))
         return MetricCard(
             title: "Network", symbol: "network", tint: .green, badge: "↓ / ↑",
             value: value, unit: "\(unit)/s",
-            footer: "↓ Download · ↑ \(Self.bytes(monitor.up, .file))/s"
+            footer: "↓ Download · ↑ \(PanelView.bytes(monitor.up, .file))/s"
         ) {
             Sparkline(values: monitor.downHistory, tint: .green, maxValue: nil)
         }
@@ -155,21 +157,15 @@ struct PanelView: View {
     }
 
     private var footer: some View {
-        HStack {
+        HStack(spacing: 2) {
             Button {
-                dismiss()  // a new key window doesn't close the popover on its own
-                DashboardWindow.show(monitor)
+                openDashboard(.overview)
             } label: {
                 Label("Open dashboard", systemImage: "square.grid.2x2")
             }
             Spacer()
-            Button {
-                showingSettings = true
-            } label: {
-                Image(systemName: "slider.horizontal.3")
-            }
-            .help("Settings")
-            .padding(.trailing, 8)
+            Button(action: openSettings) { Image(systemName: "slider.horizontal.3") }
+                .help("Settings")
             Button {
                 NSApp.terminate(nil)
             } label: {
@@ -177,12 +173,13 @@ struct PanelView: View {
             }
             .help("Quit Sonar")
         }
-        .buttonStyle(.plain)
+        .buttonStyle(HoverButtonStyle())
         .font(.system(size: 12, weight: .medium))
-        .foregroundStyle(.secondary)
-        .padding(.top, 2)
+        .padding(.horizontal, -8)  // align the hover highlight's text with the cards above
     }
+}
 
+extension PanelView {
     // MARK: Formatting
 
     static func bytes<T: BinaryInteger>(_ v: T, _ style: ByteCountFormatStyle.Style) -> String {
@@ -197,12 +194,6 @@ struct PanelView: View {
         return (String(parts.first ?? ""), parts.dropFirst().joined(separator: " "))
     }
 
-    static func temp(_ t: Double?) -> String? { t.map { "\(Int($0.rounded())) °C" } }
-
-    static func duration(_ t: TimeInterval) -> String {
-        let m = Int(t) / 60, h = m / 60, d = h / 24
-        return d > 0 ? "\(d)d \(h % 24)h" : "\(h)h \(m % 60)m"
-    }
 }
 
 // MARK: Components
@@ -225,6 +216,49 @@ struct CardBackground: ViewModifier {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.primary.opacity(0.07)))
+    }
+}
+
+/// Plain button with a hover highlight, so it reads as clickable.
+struct HoverButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { Styled(configuration: configuration) }
+
+    private struct Styled: View {
+        let configuration: Configuration
+        @State private var hovering = false
+
+        var body: some View {
+            configuration.label
+                .padding(.horizontal, 8).padding(.vertical, 5)
+                .foregroundStyle(hovering ? .primary : .secondary)
+                .background(
+                    .primary.opacity(configuration.isPressed ? 0.14 : hovering ? 0.08 : 0),
+                    in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .onHover { hovering = $0 }
+        }
+    }
+}
+
+/// A whole card as a button: lightens on hover, darkens while pressed.
+private struct CardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { Styled(configuration: configuration) }
+
+    private struct Styled: View {
+        let configuration: Configuration
+        @State private var hovering = false
+
+        var body: some View {
+            configuration.label
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(.primary.opacity(configuration.isPressed ? 0.07 : hovering ? 0.035 : 0))
+                        .allowsHitTesting(false)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .onHover { hovering = $0 }
+        }
     }
 }
 
@@ -253,8 +287,6 @@ private struct MetricCard<Visual: View>: View {
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value)
                     .font(.system(size: 26, weight: .semibold, design: .rounded)).monospacedDigit()
-                    .contentTransition(.numericText())
-                    .animation(.snappy, value: value)
                 Text(unit).font(.system(size: 12, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
             }
             .lineLimit(1)

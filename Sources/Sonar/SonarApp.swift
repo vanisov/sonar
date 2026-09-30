@@ -27,7 +27,7 @@ struct SonarApp: App {
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(5))
             let renderer = ImageRenderer(
-                content: PanelView(monitor: monitor, showingSettings: .constant(false))
+                content: PanelContent(monitor: monitor)
                     .background(Color(white: 0.13))
                     .environment(\.colorScheme, .dark))
             renderer.scale = 2
@@ -64,10 +64,11 @@ enum MenuBarItem: String, CaseIterable {
 
     /// What to draw: an optional SF Symbol and the value.
     @MainActor func part(_ m: Monitor) -> (symbol: String?, value: String)? {
-        switch self {
-        case .cpu: (nil, "\(Int(m.cpu.rounded()))%")
-        case .cpuTemp: m.cpuTemp.map { (nil, "\(Int($0.rounded()))°") }
-        case .gpuTemp: m.gpuTemp.map { ("square.stack.3d.up", "\(Int($0.rounded()))°") }
+        func degrees(_ c: Double) -> String { "\(Int(TemperatureUnit.convert(c).rounded()))°" }
+        return switch self {
+        case .cpu: ("cpu", "\(Int(m.cpu.rounded()))%")
+        case .cpuTemp: m.cpuTemp.map { ("thermometer.medium", degrees($0)) }
+        case .gpuTemp: m.gpuTemp.map { ("square.stack.3d.up", degrees($0)) }
         case .memory: ("memorychip", "\(Int(m.memoryPercent.rounded()))%")
         case .network: (nil, "↓\(PanelView.bytes(m.down, .file))/s")
         case .fan: m.fanRPMs.max().map { ("fan", String(Int($0))) }
@@ -78,6 +79,7 @@ enum MenuBarItem: String, CaseIterable {
 private struct MenuBarLabel: View {
     let monitor: Monitor
     @AppStorage(MenuBarItem.storageKey) private var items = MenuBarItem.defaults
+    @AppStorage(TemperatureUnit.storageKey) private var unit = TemperatureUnit.system.rawValue  // redraw on change
 
     private static var cached: (key: String, image: NSImage)?
 
@@ -86,7 +88,7 @@ private struct MenuBarLabel: View {
         let parts = MenuBarItem.allCases.filter { enabled.contains(Substring($0.rawValue)) }.compactMap { $0.part(monitor) }
         // Values usually round to the same text between samples; only redraw when it actually changes.
         let key = parts.map { ($0.symbol ?? "") + $0.value }.joined(separator: " ")
-        if Self.cached?.key != key { Self.cached = (key, Self.template(parts)) }
+        if Self.cached?.key != key { Self.cached = (key, parts.isEmpty ? Self.logo : Self.template(parts)) }
         return Image(nsImage: Self.cached!.image)
     }
 
@@ -102,10 +104,12 @@ private struct MenuBarLabel: View {
                 .withSymbolConfiguration(.init(pointSize: 13, weight: .regular))
             text.append(NSAttributedString(attachment: attachment))
         }
-        symbol("dot.radiowaves.left.and.right")
-        for part in parts {
-            text.append(NSAttributedString(string: "  "))
-            if let name = part.symbol { symbol(name) }
+        for (i, part) in parts.enumerated() {
+            if i > 0 { text.append(NSAttributedString(string: "  ")) }
+            if let name = part.symbol {
+                symbol(name)
+                text.append(NSAttributedString(string: " "))
+            }
             text.append(NSAttributedString(string: part.value))
         }
         text.addAttributes([.font: font, .foregroundColor: NSColor.black], range: NSRange(location: 0, length: text.length))
@@ -117,4 +121,30 @@ private struct MenuBarLabel: View {
         image.isTemplate = true
         return image
     }
+
+    /// Sonar's pulse mark (same geometry as Icon/make-icon.swift), shown when no stats are enabled.
+    private static let logo: NSImage = {
+        let image = NSImage(size: NSSize(width: 20, height: 16), flipped: true) { rect in
+            let width: CGFloat = 16, height: CGFloat = 8, half: CGFloat = 3.2
+            let x = rect.midX, y = rect.midY + height / 2, x0 = x - width / 2
+            let path = NSBezierPath()
+            path.move(to: NSPoint(x: x0, y: y))
+            path.line(to: NSPoint(x: x - half, y: y))
+            path.curve(
+                to: NSPoint(x: x, y: y - height), controlPoint1: NSPoint(x: x - half * 0.45, y: y),
+                controlPoint2: NSPoint(x: x - half * 0.42, y: y - height))
+            path.curve(
+                to: NSPoint(x: x + half, y: y), controlPoint1: NSPoint(x: x + half * 0.42, y: y - height),
+                controlPoint2: NSPoint(x: x + half * 0.45, y: y))
+            path.line(to: NSPoint(x: x0 + width, y: y))
+            path.lineWidth = 1.6
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+            NSColor.black.setStroke()
+            path.stroke()
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }()
 }

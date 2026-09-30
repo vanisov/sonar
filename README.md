@@ -30,9 +30,9 @@
 ## features
 
 - **everything in one glance** — CPU, GPU, memory, disk, network, fans and your hungriest apps, in one panel that feels like it shipped with macOS.
-- **real temperatures** — CPU and GPU temperatures straight from the SMC. sensors are discovered per chip at launch instead of hard-coded tables (developed on an M4 Pro, reports from other chips welcome).
+- **real temperatures** — CPU and GPU temperatures straight from the SMC, in °C or °F. sensors are discovered per chip at launch instead of hard-coded tables (developed on an M4 Pro, reports from other chips welcome).
 - **your numbers in the menu bar** — pick any mix of CPU %, CPU temp, GPU temp, memory, network and fan speed.
-- **a dashboard when you want more** — an hour of history for every metric, every temperature sensor on your Mac, and a sortable list of every app.
+- **a dashboard when you want more** — click any card for an hour of history, every temperature sensor on your Mac, and a sortable list of every app.
 - **apps, not processes** — helpers are counted toward the app that owns them, so Safari's web content processes show up as Safari.
 - **light on your mac** — about 0.3% of one core and ~20 MB of memory when idle, no idle wake-ups, no helper tools, no root, no network access, no telemetry. expensive readings only run while you're looking.
 - **100% Swift** — SwiftUI and Swift Charts, no dependencies, about 1,000 lines.
