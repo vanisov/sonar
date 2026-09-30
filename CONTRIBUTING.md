@@ -25,8 +25,8 @@ swift run              # run from source
 ## Before you open a PR
 
 ```bash
-xcrun swift-format format --in-place --recursive Sources Icon/make-icon.swift
-xcrun swift-format lint --strict --recursive Sources Icon/make-icon.swift
+xcrun swift-format format --in-place --recursive Sources
+xcrun swift-format lint --strict --recursive Sources
 swift build -c release
 ./perf.sh               # with Sonar.app running and the panel closed
 ```

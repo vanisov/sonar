@@ -1,4 +1,6 @@
-#!/usr/bin/env swift  // Renders the app icon and builds Icon/Sonar.icns.
+#!/usr/bin/env swift
+
+// Renders the app icon and builds Icon/Sonar.icns.
 // Run: ./Icon/make-icon.swift   (needs Xcode's toolchain: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer)
 import AppKit
 import SwiftUI

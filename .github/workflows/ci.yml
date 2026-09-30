@@ -11,6 +11,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Lint
-        run: xcrun swift-format lint --strict --recursive Sources Icon/make-icon.swift
+        run: xcrun swift-format lint --strict --recursive Sources
       - name: Build
         run: DEVELOPER_DIR="$(xcode-select -p)" ./bundle.sh
