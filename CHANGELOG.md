@@ -8,6 +8,29 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-30
+
+### Added
+- A redesigned dashboard: a sidebar with every metric under Overview, and a page for each one.
+  - CPU: usage and temperature charts, every core (performance and efficiency), load average, top apps.
+  - GPU, memory (app, wired, compressed, cached, swap), disk (space and read/write activity), network
+    (interfaces, totals since boot), sensors and fans.
+  - This Mac: model, chip, cores, displays, macOS build, uptime, battery health, storage, and Copy Specs.
+- Pick the time range for every chart: 1 minute, 5, 15, 30 minutes, or 1 hour, with min, average and max.
+- Search apps, sensors and sections from the dashboard toolbar.
+- A Settings window (⌘,) with General, Menu Bar, Panel, Dashboard, Units and About tabs:
+  - Reorder menu bar stats, choose icon/value per stat, decimal places, and warning colors.
+  - Choose and reorder the panel's cards, the number of top apps and the sparkline length.
+  - Default time range, chart style, temperature overlay, and average or hottest CPU temperature.
+  - Storage in GB or GiB, network in bytes or bits.
+  - A global keyboard shortcut to open the dashboard.
+  - Appearance (system, light, dark) and Restore Defaults.
+- Optional update checks against GitHub releases, with install and relaunch. Off by default.
+- New icon, logo and colors.
+
+### Changed
+- CPU and GPU temperature sensors are read less often when only the menu bar needs them.
+
 ## [1.2.1] - 2026-09-29
 
 ### Fixed
@@ -51,7 +74,8 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 - Choice of stats in the menu bar, and launch at login.
 - Dashboard with an hour of history, every temperature sensor, and all running apps.
 
-[Unreleased]: https://github.com/vanisov/sonar/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/vanisov/sonar/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/vanisov/sonar/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/vanisov/sonar/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/vanisov/sonar/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/vanisov/sonar/compare/v1.0.0...v1.1.0
