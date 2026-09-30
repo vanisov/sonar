@@ -8,6 +8,20 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-30
+
+### Added
+- Processes in the dashboard: every app and background process with CPU, memory, threads, PID and user,
+  sortable, with All / Applications / Background tabs. Search filters it by name or PID.
+- Select one or more processes and use the control bar above the table to Quit or Force Quit apps, End or Force
+  End background processes, show them in Finder, or see details (⌘I or double-click). ⌘⌫ quits, ⌥⌘⌫ forces; forceful actions
+  ask first (Settings → Dashboard). Right-click works too.
+- Other users' and system processes are listed but locked, and so is `loginwindow`, which would log you out.
+- Settings warns when a keyboard shortcut is already used by macOS, like ⌥⌘D for Dock hiding.
+
+### Changed
+- Apps in the dashboard sidebar are now called Processes.
+
 ## [1.3.2] - 2026-09-30
 
 ### Changed
@@ -87,7 +101,8 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 - Choice of stats in the menu bar, and launch at login.
 - Dashboard with an hour of history, every temperature sensor, and all running apps.
 
-[Unreleased]: https://github.com/vanisov/sonar/compare/v1.3.2...HEAD
+[Unreleased]: https://github.com/vanisov/sonar/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/vanisov/sonar/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/vanisov/sonar/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/vanisov/sonar/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/vanisov/sonar/compare/v1.2.1...v1.3.0

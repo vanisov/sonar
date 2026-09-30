@@ -30,6 +30,10 @@ enum Prefs {
     static let overlayTemperature = "overlayTemperature"
     static let cpuTempSource = "cpuTempHottest"  // false = average
 
+    // Processes
+    static let confirmForce = "confirmForceQuit"
+    static let showSystemProcesses = "showSystemProcesses"
+
     // Units
     static let temperatureUnit = TemperatureUnit.storageKey
     static let storageBinary = "storageBinary"

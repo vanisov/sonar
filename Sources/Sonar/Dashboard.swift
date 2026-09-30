@@ -17,7 +17,7 @@ enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
         case .network: "Network"
         case .sensors: "Sensors"
         case .fans: "Fans"
-        case .apps: "Apps"
+        case .apps: "Processes"
         case .system: "This Mac"
         }
     }
@@ -32,7 +32,7 @@ enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
         case .network: "network"
         case .sensors: "thermometer.medium"
         case .fans: "fan"
-        case .apps: "square.grid.2x2"
+        case .apps: "list.bullet.rectangle"
         case .system: "laptopcomputer"
         }
     }
@@ -122,7 +122,7 @@ struct DashboardView: View {
                 .navigationSplitViewColumnWidth(min: 190, ideal: 214, max: 280)
         } detail: {
             detail
-                .navigationTitle(nav.query.isEmpty ? (nav.section ?? .overview).title : "Search")
+                .navigationTitle(nav.query.isEmpty || nav.section == .apps ? (nav.section ?? .overview).title : "Search")
                 .navigationSubtitle(subtitle)
                 .toolbar {
                     if showsRange {
@@ -158,10 +158,10 @@ struct DashboardView: View {
     }
 
     private var subtitle: String {
-        guard nav.query.isEmpty else { return "" }
+        guard nav.query.isEmpty || nav.section == .apps else { return "" }
         switch nav.section ?? .overview {
         case .system: return "About this Mac"
-        case .apps: return "\(monitor.apps.count) running"
+        case .apps: return monitor.processes.isEmpty ? "Running now" : "\(monitor.processes.count) running"
         case .sensors: return "\(monitor.sensors.count) sensors"
         default: return (TimeRange(rawValue: range) ?? .fifteenMinutes).long
         }
@@ -210,9 +210,9 @@ struct DashboardView: View {
     // MARK: Detail
 
     @ViewBuilder private var detail: some View {
-        if !nav.query.isEmpty {
-            SearchResults(monitor: monitor, query: nav.query) { section in
-                nav.query = ""
+        if !nav.query.isEmpty && nav.section != .apps {
+            SearchResults(monitor: monitor, query: nav.query) { section, keepQuery in
+                if !keepQuery { nav.query = "" }
                 nav.section = section
             }
         } else {
@@ -225,7 +225,7 @@ struct DashboardView: View {
             case .network: NetworkPage(monitor: monitor)
             case .sensors: SensorsPage(sensors: monitor.sensors)
             case .fans: FansPage(monitor: monitor)
-            case .apps: AppsTable(apps: monitor.apps)
+            case .apps: ProcessesPage(monitor: monitor, query: nav.query)
             case .system: ThisMacPage(monitor: monitor)
             }
         }
@@ -236,7 +236,7 @@ struct DashboardView: View {
 private struct SearchResults: View {
     let monitor: Monitor
     let query: String
-    let open: (DashboardSection) -> Void
+    let open: (_ section: DashboardSection, _ keepQuery: Bool) -> Void
 
     var body: some View {
         let q = query.lowercased()
@@ -248,7 +248,7 @@ private struct SearchResults: View {
                 Section("Sections") {
                     ForEach(sections) { s in
                         result {
-                            open(s)
+                            open(s, false)
                         } label: {
                             Label(s.title, systemImage: s.symbol)
                         }
@@ -259,7 +259,7 @@ private struct SearchResults: View {
                 Section("Apps") {
                     ForEach(apps) { app in
                         result {
-                            open(.apps)
+                            open(.apps, true)
                         } label: {
                             HStack {
                                 if let icon = app.icon { Image(nsImage: icon).resizable().frame(width: 18, height: 18) }
@@ -276,7 +276,7 @@ private struct SearchResults: View {
                 Section("Sensors") {
                     ForEach(sensors.prefix(20)) { s in
                         result {
-                            open(.sensors)
+                            open(.sensors, false)
                         } label: {
                             HStack {
                                 Text(s.group)

@@ -255,6 +255,8 @@ private struct DashboardSettings: View {
     @AppStorage(Prefs.chartFilled) private var filled = true
     @AppStorage(Prefs.overlayTemperature) private var overlay = true
     @AppStorage(Prefs.cpuTempSource) private var hottest = false
+    @AppStorage(Prefs.confirmForce) private var confirmForce = true
+    @AppStorage(Prefs.showSystemProcesses) private var showSystem = true
 
     var body: some View {
         Form {
@@ -262,7 +264,7 @@ private struct DashboardSettings: View {
                 Picker("Open to", selection: $openTo) {
                     Text("Last section viewed").tag("last")
                     Text("Overview").tag(DashboardSection.overview.rawValue)
-                    Text("Apps").tag(DashboardSection.apps.rawValue)
+                    Text("Processes").tag(DashboardSection.apps.rawValue)
                 }
                 Picker("Default time range", selection: $range) {
                     ForEach(TimeRange.allCases) { Text($0.short).tag($0.rawValue) }
@@ -285,9 +287,18 @@ private struct DashboardSettings: View {
             } footer: {
                 Text("Also used in the panel and the menu bar.").foregroundStyle(.secondary)
             }
+            Section {
+                Toggle("Confirm before Force Quit and Force End", isOn: $confirmForce)
+                Toggle("Show other users' and system processes", isOn: $showSystem)
+            } header: {
+                Text("Processes")
+            } footer: {
+                Text("macOS doesn't let Sonar read or end other users' processes, so they're listed with a lock.")
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
-        .frame(height: 390)
+        .frame(height: 530)
     }
 }
 
