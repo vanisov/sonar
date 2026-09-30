@@ -6,6 +6,7 @@ cd "$(dirname "$0")"
 
 # SwiftUI's macros ship with Xcode, not the Command Line Tools.
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+VERSION="${VERSION:-$(git describe --tags --abbrev=0 2>/dev/null | sed "s/^v//")}" # latest release tag, e.g. v1.1.0 -> 1.1.0
 VERSION="${VERSION:-1.0}"
 
 swift build -c release
