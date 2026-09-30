@@ -8,6 +8,22 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-29
+
+### Added
+- Click any card in the panel to open the dashboard at that section.
+- Temperatures in °C or °F (Settings → General). Defaults to your region's unit.
+- Sonar shows in the Dock while the dashboard is open.
+- Hover highlights on the panel's buttons and cards.
+
+### Changed
+- The panel starts straight with your Mac's stats; the Sonar header is gone.
+- Each menu bar stat has its own icon. The Sonar logo appears only when no stats are shown.
+- Numbers update in place without the rolling animation.
+
+### Fixed
+- `--snapshot` rendered an empty image.
+
 ## [1.1.0] - 2026-09-29
 
 ### Changed
@@ -29,6 +45,7 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 - Choice of stats in the menu bar, and launch at login.
 - Dashboard with an hour of history, every temperature sensor, and all running apps.
 
-[Unreleased]: https://github.com/vanisov/sonar/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/vanisov/sonar/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/vanisov/sonar/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/vanisov/sonar/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/vanisov/sonar/releases/tag/v1.0.0
