@@ -91,13 +91,13 @@ struct ProcessesPage: View {
                 .fixedSize()
                 if let status { Text(status).font(.callout).foregroundStyle(.secondary) }
                 Spacer()
-                Text("Select processes, then use Quit or Force Quit in the toolbar").font(.caption).foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 20).padding(.vertical, 10)
+            .padding(.horizontal, 20).padding(.top, 10)
+            controlBar
+                .padding(.horizontal, 20).padding(.vertical, 10)
             header
             processList(apps: apps, background: background)
         }
-        .toolbar { actions }
         .onAppear(perform: monitor.processesAppeared)
         .onDisappear(perform: monitor.processesDisappeared)
         .overlay {
@@ -159,15 +159,19 @@ struct ProcessesPage: View {
         return rows.allSatisfy(\.isApp) ? "Force quit \(what)?" : "Force end \(what)?"
     }
 
-    @ToolbarContentBuilder private var actions: some ToolbarContent {
+    /// What's selected on the left, labeled actions on the right. Always visible, so it's obvious what you can do.
+    private var controlBar: some View {
+        let selected = rows(selection)
         let targets = actionable
-        ToolbarItemGroup(placement: .primaryAction) {
+        return HStack(spacing: 10) {
+            selectionSummary(selected)
+            Spacer(minLength: 12)
             Button {
                 request(targets, force: false)
             } label: {
                 Label(verb(targets, force: false), systemImage: "xmark.circle")
             }
-            .help("\(verb(targets, force: false)) the selected processes (⌘⌫)")
+            .help("\(verb(targets, force: false)) the selection (⌘⌫). Apps can still ask to save.")
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(targets.isEmpty)
 
@@ -176,30 +180,74 @@ struct ProcessesPage: View {
             } label: {
                 Label(verb(targets, force: true), systemImage: "exclamationmark.octagon")
             }
-            .help("\(verb(targets, force: true)) the selected processes immediately (⌥⌘⌫)")
+            .tint(.red)
+            .help("\(verb(targets, force: true)) the selection immediately (⌥⌘⌫)")
             .keyboardShortcut(.delete, modifiers: [.command, .option])
             .disabled(targets.isEmpty)
 
             Button {
-                reveal(rows(selection))
+                reveal(selected)
             } label: {
                 Label("Show in Finder", systemImage: "folder")
             }
-            .help("Show in Finder")
-            .disabled(rows(selection).allSatisfy { $0.executableURL == nil })
+            .disabled(selected.allSatisfy { $0.executableURL == nil })
 
             Button {
                 showInfo.toggle()
             } label: {
                 Label("Info", systemImage: "info.circle")
             }
-            .help("Details (double-click a process)")
+            .help("Details (⌘I or double-click a process)")
             .keyboardShortcut("i", modifiers: .command)
-            .disabled(selection.isEmpty)
+            .disabled(selected.isEmpty)
             .popover(isPresented: $showInfo, arrowEdge: .bottom) {
                 ProcessInfoView(rows: rows(selection))
             }
         }
+        .buttonStyle(.bordered)
+        .labelStyle(.titleAndIcon)
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.primary.opacity(0.07)))
+    }
+
+    @ViewBuilder private func selectionSummary(_ selected: [ProcessRow]) -> some View {
+        if selected.count == 1, let row = selected.first {
+            HStack(spacing: 8) {
+                Group {
+                    if let icon = row.icon {
+                        Image(nsImage: icon).resizable()
+                    } else {
+                        Image(systemName: "gearshape").foregroundStyle(.secondary)
+                    }
+                }
+                .frame(width: 20, height: 20)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(row.name).font(.callout.weight(.semibold)).lineLimit(1)
+                    Text(summaryLine(row)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+        } else if selected.count > 1 {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("\(selected.count) processes selected").font(.callout.weight(.semibold))
+                Text(
+                    "\(Fmt.memory(selected.compactMap(\.memory).reduce(0, +))) · \(Fmt.percent(selected.compactMap(\.cpu).reduce(0, +), decimals: 1)) CPU"
+                        + (selected.contains { $0.locked != nil } ? " · locked ones are skipped" : "")
+                )
+                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+        } else {
+            Label("Select a process to quit it or see details. ⌘-click selects several.", systemImage: "cursorarrow.click")
+                .font(.callout).foregroundStyle(.secondary).lineLimit(1)
+        }
+    }
+
+    private func summaryLine(_ row: ProcessRow) -> String {
+        if row.locked == .otherUser { return "Owned by \(row.user) · can't be ended" }
+        if row.locked == .protected { return "Part of your login session · can't be ended" }
+        let memory = row.memory.map { Fmt.memory($0) } ?? "—"
+        let cpu = row.cpu.map { Fmt.percent($0, decimals: 1) } ?? "—"
+        return row.isApp ? "\(memory) · \(cpu) CPU · \(row.processCount) processes" : "\(memory) · \(cpu) CPU · PID \(row.id)"
     }
 
     @ViewBuilder private func menu(for rows: [ProcessRow]) -> some View {

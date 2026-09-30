@@ -13,8 +13,8 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 ### Added
 - Processes in the dashboard: every app and background process with CPU, memory, threads, PID and user,
   sortable, with All / Applications / Background tabs. Search filters it by name or PID.
-- Select one or more processes and use the toolbar to Quit or Force Quit apps, End or Force End background
-  processes, show them in Finder, or see details (⌘I or double-click). ⌘⌫ quits, ⌥⌘⌫ forces; forceful actions
+- Select one or more processes and use the control bar above the table to Quit or Force Quit apps, End or Force
+  End background processes, show them in Finder, or see details (⌘I or double-click). ⌘⌫ quits, ⌥⌘⌫ forces; forceful actions
   ask first (Settings → Dashboard). Right-click works too.
 - Other users' and system processes are listed but locked, and so is `loginwindow`, which would log you out.
 - Settings warns when a keyboard shortcut is already used by macOS, like ⌥⌘D for Dock hiding.
