@@ -71,6 +71,7 @@ struct ProcessesPage: View {
     @State private var sortKey = SortKey.memory
     @State private var descending = true
     @State private var selected: pid_t?
+    @State private var clickPoint: CGPoint = .zero  // where the row was clicked, in the row's coordinates
     @State private var pendingForce: ProcessRow?
     @State private var status: String?
     @AppStorage(Prefs.confirmForce) private var confirmForce = true
@@ -198,15 +199,6 @@ struct ProcessesPage: View {
                         .help(row.locked == .otherUser ? "Owned by \(row.user)" : "Part of your login session")
                 }
             }
-            // Anchored to the name, opening below it, so the details appear right where you clicked.
-            .popover(
-                isPresented: Binding(get: { selected == row.id }, set: { if !$0 { selected = nil } }), arrowEdge: .bottom
-            ) {
-                ProcessPopover(row: row) { force in
-                    selected = nil
-                    request(row, force: force)
-                }
-            }
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(row.cpu.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "—").frame(
                 width: Self.widths.cpu, alignment: .trailing)
@@ -219,7 +211,20 @@ struct ProcessesPage: View {
         .font(.system(size: 12))
         .monospacedDigit()
         .contentShape(Rectangle())
-        .onTapGesture { selected = row.id }
+        .onTapGesture(coordinateSpace: .local) { point in
+            clickPoint = point
+            selected = row.id
+        }
+        // Points at the spot you clicked; macOS flips it above when there's no room below.
+        .popover(
+            isPresented: Binding(get: { selected == row.id }, set: { if !$0 { selected = nil } }),
+            attachmentAnchor: .rect(.rect(CGRect(origin: clickPoint, size: .zero))), arrowEdge: .bottom
+        ) {
+            ProcessPopover(row: row) { force in
+                selected = nil
+                request(row, force: force)
+            }
+        }
         .contextMenu {
             if row.locked == nil {
                 Button(row.isApp ? "Quit" : "End Process") { request(row, force: false) }
