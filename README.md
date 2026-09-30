@@ -20,7 +20,9 @@
 ---
 
 <p align="center">
-  <img src="docs/popover.png" alt="Sonar's menu bar panel showing CPU, GPU, memory, disk, network, fans and top apps" width="380" />
+  <img src="docs/popover.png" alt="Sonar's menu bar panel showing CPU, GPU, memory, disk, network, fans and top apps" width="300" />
+  &nbsp;
+  <img src="docs/dashboard.png" alt="Sonar's dashboard: sidebar with every metric, paired usage and temperature charts, and a time range picker" width="560" />
 </p>
 
 **your mac, at a glance.** a tiny, native menu bar monitor for Apple silicon.
@@ -30,12 +32,13 @@
 ## features
 
 - **everything in one glance** — CPU, GPU, memory, disk, network, fans and your hungriest apps, in one panel that feels like it shipped with macOS.
-- **real temperatures** — CPU and GPU temperatures straight from the SMC, in °C or °F. sensors are discovered per chip at launch instead of hard-coded tables (developed on an M4 Pro, reports from other chips welcome).
-- **your numbers in the menu bar** — pick any mix of CPU %, CPU temp, GPU temp, memory, network and fan speed.
-- **a dashboard when you want more** — click any card for an hour of history, every temperature sensor on your Mac, and a sortable list of every app.
+- **a real dashboard** — a page for every metric with charts over 1 minute to 1 hour, min / average / max, every CPU core, where your memory goes, disk activity, network interfaces, fans, and an About-this-Mac page with battery health. search it all with ⌘F.
+- **real temperatures** — CPU and GPU temperatures straight from the SMC, in °C or °F, averaged or hottest-core. sensors are discovered per chip at launch instead of hard-coded tables (developed on an M4 Pro, reports from other chips welcome).
+- **your menu bar, your way** — pick any mix of CPU %, temperatures, memory, network and fan speed, reorder them, show icons or values, and have them turn orange or red when something needs attention.
+- **full control** — a proper Settings window (⌘,) for the menu bar, panel, dashboard, units, a global keyboard shortcut, and appearance.
 - **apps, not processes** — helpers are counted toward the app that owns them, so Safari's web content processes show up as Safari.
-- **light on your mac** — about 0.3% of one core and ~20 MB of memory when idle, no idle wake-ups, no helper tools, no root, no network access, no telemetry. expensive readings only run while you're looking.
-- **100% Swift** — SwiftUI and Swift Charts, no dependencies, about 1,000 lines.
+- **light on your mac** — about 0.5% of one core when idle, no helper tools, no root, no telemetry. expensive readings only run while you're looking, and windows are torn down when you close them.
+- **100% Swift** — SwiftUI, AppKit and Swift Charts, no dependencies.
 
 ## install
 
@@ -43,7 +46,9 @@
 2. unzip it and drag **Sonar.app** into **Applications**
 3. open it. the first time, macOS will block it because it isn't notarized: go to **System Settings → Privacy & Security** and click **Open Anyway**
 
-Sonar lives in your menu bar. click the icon to open the panel, and use the sliders button to choose what shows in the menu bar and to launch it at login.
+Sonar lives in your menu bar. click it to open the panel, click any card to open the dashboard, and press ⌘, (or the sliders button) for Settings.
+
+to update, turn on **Settings → About → Automatically check for updates**, or download the new zip and replace the app.
 
 ## build from source
 
@@ -57,9 +62,9 @@ cd sonar
 
 `./bundle.sh` on its own builds `build/Sonar.app` and `build/Sonar.zip` without installing. for quick iteration, `swift run` or open `Package.swift` in Xcode.
 
-the app icon is drawn in code: edit `Icon/make-icon.swift` and run it to regenerate `Icon/Sonar.icns`.
+the app icon is drawn in code: edit `Icon/make-icon.swift` and run it to regenerate `Icon/Sonar.icns`. the "sonar" wordmark is traced from the Unbounded typeface by `Icon/make-wordmark.swift`, so the app ships a small shape instead of a font file.
 
-`./perf.sh` checks the running app against its idle budget (CPU, memory, wake-ups). close the panel first.
+`./perf.sh` checks the running app against its idle budget (CPU, memory, wake-ups). open and close the panel, dashboard and Settings once first, then run it with everything closed.
 
 ## how it works
 
@@ -74,6 +79,12 @@ the app icon is drawn in code: edit `Icon/make-icon.swift` and run it to regener
 | top apps | `proc_pid_rusage`, grouped by the responsible app |
 
 cheap readings (CPU, memory, network) run every 2 seconds. expensive ones (GPU, temperatures, fans, per-app usage) run every 2 seconds only while the panel or dashboard is open, or when the menu bar shows them, and every 10 seconds otherwise. an hour of history is kept in memory in fixed-size buffers. nothing is written to disk except your settings.
+
+## privacy
+
+Sonar has no analytics, no telemetry and no account. everything it reads stays on your Mac, and only your settings are written to disk.
+
+the only network request Sonar can make is the update check: once a day it asks GitHub for the list of Sonar releases. it's **off until you turn it on** in Settings → About, and nothing about you or your Mac is sent.
 
 ## troubleshooting
 
@@ -95,7 +106,8 @@ if you are an AI agent working on this repository, read [`AGENTS.md`](AGENTS.md)
 
 ## thanks
 
-SMC and sensor research by the [Stats](https://github.com/exelban/stats) project was a great reference.
+- SMC and sensor research by the [Stats](https://github.com/exelban/stats) project was a great reference.
+- the wordmark is traced from [Unbounded](https://github.com/googlefonts/unbounded) by The Unbounded Project Authors, licensed under the SIL Open Font License 1.1.
 
 ## license
 

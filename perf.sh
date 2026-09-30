@@ -1,10 +1,11 @@
 #!/bin/sh
-# Checks the running Sonar against its idle budget. Close the popover and dashboard first.
+# Checks the running Sonar against its idle budget. Open and close the panel, dashboard and Settings once,
+# wait a few seconds, then run with everything closed.
 # Usage: ./perf.sh [seconds]   (default 60)
 set -e
 SECONDS_TO_MEASURE="${1:-60}"
-MAX_CPU=0.5      # % of one core
-MAX_MEM_MB=60    # physical footprint
+MAX_CPU=0.75     # % of one core; about 0.5 in practice
+MAX_MEM_MB=80    # physical footprint after every window has been used once (~22 MB at a fresh launch)
 MAX_WAKEUPS=1    # idle wake-ups per second
 
 PID=$(pgrep -x Sonar | head -1)

@@ -5,7 +5,7 @@ Thanks for helping. Sonar is small on purpose, so a few rules keep it that way.
 ## Principles
 
 - **Lightweight first.** Sonar should cost about nothing when you're not looking at it. Every change is
-  checked against the idle budget in [`perf.sh`](perf.sh): ≤ 0.5% of one core, ≤ 60 MB, no idle wake-ups.
+  checked against the idle budget in [`perf.sh`](perf.sh): ≤ 0.75% of one core, ≤ 80 MB after every window has been used once, and under one idle wake-up a second.
 - **Native and minimal.** SwiftUI, AppKit and Apple frameworks only. No third-party dependencies.
 - **Read-only by default.** Sonar never changes system settings. Actions that affect other apps
   (like ending a process) need a clear, deliberate click.
