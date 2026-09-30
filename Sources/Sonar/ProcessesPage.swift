@@ -70,9 +70,9 @@ struct ProcessesPage: View {
     @State private var tab = Tab.all
     @State private var sortKey = SortKey.memory
     @State private var descending = true
-    @State private var selected: pid_t?
-    @State private var clickPoint: CGPoint = .zero  // where the row was clicked, in the row's coordinates
-    @State private var pendingForce: ProcessRow?
+    @State private var selection = Set<pid_t>()
+    @State private var showInfo = false
+    @State private var pendingForce: [ProcessRow] = []
     @State private var status: String?
     @AppStorage(Prefs.confirmForce) private var confirmForce = true
     @AppStorage(Prefs.showSystemProcesses) private var showSystem = true
@@ -91,21 +91,13 @@ struct ProcessesPage: View {
                 .fixedSize()
                 if let status { Text(status).font(.callout).foregroundStyle(.secondary) }
                 Spacer()
-                Text("Click a process to see details and end it").font(.caption).foregroundStyle(.tertiary)
+                Text("Select processes, then use Quit or Force Quit in the toolbar").font(.caption).foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 20).padding(.vertical, 10)
             header
-            List {
-                if tab != .background && !apps.isEmpty {
-                    Section("Applications · \(apps.count)") { ForEach(apps) { row($0) } }
-                }
-                if tab != .apps && !background.isEmpty {
-                    Section("Background processes · \(background.count)") { ForEach(background) { row($0) } }
-                }
-            }
-            .listStyle(.inset(alternatesRowBackgrounds: true))
-            .environment(\.defaultMinListRowHeight, 24)
+            processList(apps: apps, background: background)
         }
+        .toolbar { actions }
         .onAppear(perform: monitor.processesAppeared)
         .onDisappear(perform: monitor.processesDisappeared)
         .overlay {
@@ -116,15 +108,144 @@ struct ProcessesPage: View {
             }
         }
         .confirmationDialog(
-            pendingForce.map { $0.isApp ? "Force quit \($0.name)?" : "Force end \($0.name)?" } ?? "",
-            isPresented: Binding(get: { pendingForce != nil }, set: { if !$0 { pendingForce = nil } }),
-            presenting: pendingForce
-        ) { row in
-            Button(row.isApp ? "Force Quit" : "Force End", role: .destructive) { perform(row, force: true) }
-        } message: { row in
-            Text(row.isApp ? "Unsaved changes in \(row.name) will be lost." : "The process stops immediately.")
+            forceTitle(pendingForce),
+            isPresented: Binding(get: { !pendingForce.isEmpty }, set: { if !$0 { pendingForce = [] } })
+        ) {
+            Button(verb(pendingForce, force: true), role: .destructive) { perform(pendingForce, force: true) }
+        } message: {
+            Text(pendingForce.contains(where: \.isApp) ? "Unsaved changes will be lost." : "The processes stop immediately.")
         }
     }
+
+    private func processList(apps: [ProcessRow], background: [ProcessRow]) -> some View {
+        List(selection: $selection) {
+            if tab != .background && !apps.isEmpty {
+                Section("Applications · \(apps.count)") {
+                    ForEach(apps, id: \.id) { (r: ProcessRow) in row(r).tag(r.id) }
+                }
+            }
+            if tab != .apps && !background.isEmpty {
+                Section("Background processes · \(background.count)") {
+                    ForEach(background, id: \.id) { (r: ProcessRow) in row(r).tag(r.id) }
+                }
+            }
+        }
+        .listStyle(.inset(alternatesRowBackgrounds: true))
+        .environment(\.defaultMinListRowHeight, 24)
+        .contextMenu(forSelectionType: pid_t.self) { (ids: Set<pid_t>) in
+            menu(for: rows(ids))
+        } primaryAction: { (ids: Set<pid_t>) in
+            selection = ids
+            showInfo = true  // double-click shows details
+        }
+    }
+
+    // MARK: Selection and actions
+
+    private func rows(_ ids: Set<pid_t>) -> [ProcessRow] { monitor.processes.filter { ids.contains($0.id) } }
+
+    /// Selected rows that Sonar is allowed to end.
+    private var actionable: [ProcessRow] { rows(selection).filter { $0.locked == nil } }
+
+    /// "Quit" for apps, "End" for background processes.
+    private func verb(_ rows: [ProcessRow], force: Bool) -> String {
+        let apps = rows.allSatisfy(\.isApp)
+        return force ? (apps ? "Force Quit" : "Force End") : (apps ? "Quit" : "End")
+    }
+
+    private func forceTitle(_ rows: [ProcessRow]) -> String {
+        guard let first = rows.first else { return "" }
+        let what = rows.count == 1 ? first.name : "\(rows.count) processes"
+        return rows.allSatisfy(\.isApp) ? "Force quit \(what)?" : "Force end \(what)?"
+    }
+
+    @ToolbarContentBuilder private var actions: some ToolbarContent {
+        let targets = actionable
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button {
+                request(targets, force: false)
+            } label: {
+                Label(verb(targets, force: false), systemImage: "xmark.circle")
+            }
+            .help("\(verb(targets, force: false)) the selected processes (⌘⌫)")
+            .keyboardShortcut(.delete, modifiers: .command)
+            .disabled(targets.isEmpty)
+
+            Button {
+                request(targets, force: true)
+            } label: {
+                Label(verb(targets, force: true), systemImage: "exclamationmark.octagon")
+            }
+            .help("\(verb(targets, force: true)) the selected processes immediately (⌥⌘⌫)")
+            .keyboardShortcut(.delete, modifiers: [.command, .option])
+            .disabled(targets.isEmpty)
+
+            Button {
+                reveal(rows(selection))
+            } label: {
+                Label("Show in Finder", systemImage: "folder")
+            }
+            .help("Show in Finder")
+            .disabled(rows(selection).allSatisfy { $0.executableURL == nil })
+
+            Button {
+                showInfo.toggle()
+            } label: {
+                Label("Info", systemImage: "info.circle")
+            }
+            .help("Details (double-click a process)")
+            .keyboardShortcut("i", modifiers: .command)
+            .disabled(selection.isEmpty)
+            .popover(isPresented: $showInfo, arrowEdge: .bottom) {
+                ProcessInfoView(rows: rows(selection))
+            }
+        }
+    }
+
+    @ViewBuilder private func menu(for rows: [ProcessRow]) -> some View {
+        let targets = rows.filter { $0.locked == nil }
+        if !targets.isEmpty {
+            Button(verb(targets, force: false)) { request(targets, force: false) }
+            Button(verb(targets, force: true) + "…") { request(targets, force: true) }
+            Divider()
+        }
+        Button("Show in Finder") { reveal(rows) }
+        Button("Get Info") {
+            selection = Set(rows.map(\.id))
+            showInfo = true
+        }
+        Button(rows.count == 1 ? "Copy PID" : "Copy PIDs") {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(rows.map { String($0.id) }.joined(separator: " "), forType: .string)
+        }
+    }
+
+    private func reveal(_ rows: [ProcessRow]) {
+        let urls = rows.compactMap(\.executableURL)
+        if !urls.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(urls) }
+    }
+
+    /// Quit/End right away; forceful actions ask first unless that's turned off in Settings.
+    private func request(_ rows: [ProcessRow], force: Bool) {
+        guard !rows.isEmpty else { return }
+        if force && confirmForce { pendingForce = rows } else { perform(rows, force: force) }
+    }
+
+    private func perform(_ rows: [ProcessRow], force: Bool) {
+        let messages = rows.map { ProcessActions.end($0, force: force) }
+        let message =
+            messages.count == 1
+            ? messages[0]
+            : "\(force ? "Force ended" : "Asked") \(rows.count) processes\(force ? "" : " to \(verb(rows, force: false).lowercased())")"
+        status = message
+        selection.subtract(rows.map(\.id))
+        Task {
+            try? await Task.sleep(for: .seconds(4))
+            if status == message { status = nil }
+        }
+    }
+
+    // MARK: Filtering and sorting
 
     private var filtered: [ProcessRow] {
         let q = query.lowercased()
@@ -210,116 +331,70 @@ struct ProcessesPage: View {
         }
         .font(.system(size: 12))
         .monospacedDigit()
-        .contentShape(Rectangle())
-        .onTapGesture(coordinateSpace: .local) { point in
-            clickPoint = point
-            selected = row.id
-        }
-        // Points at the spot you clicked; macOS flips it above when there's no room below.
-        .popover(
-            isPresented: Binding(get: { selected == row.id }, set: { if !$0 { selected = nil } }),
-            attachmentAnchor: .rect(.rect(CGRect(origin: clickPoint, size: .zero))), arrowEdge: .bottom
-        ) {
-            ProcessPopover(row: row) { force in
-                selected = nil
-                request(row, force: force)
-            }
-        }
-        .contextMenu {
-            if row.locked == nil {
-                Button(row.isApp ? "Quit" : "End Process") { request(row, force: false) }
-                Button(row.isApp ? "Force Quit…" : "Force End…") { request(row, force: true) }
-                Divider()
-            }
-            if let url = row.executableURL {
-                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
-            }
-            Button("Copy PID") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(String(row.id), forType: .string)
-            }
-        }
-    }
-
-    /// Quit/End right away; forceful actions ask first unless that's turned off in Settings.
-    private func request(_ row: ProcessRow, force: Bool) {
-        if force && confirmForce { pendingForce = row } else { perform(row, force: force) }
-    }
-
-    private func perform(_ row: ProcessRow, force: Bool) {
-        let message = ProcessActions.end(row, force: force)
-        status = message
-        Task {
-            try? await Task.sleep(for: .seconds(4))
-            if status == message { status = nil }
-        }
     }
 }
 
-private struct ProcessPopover: View {
-    let row: ProcessRow
-    let end: (_ force: Bool) -> Void
+/// Details for the selected processes (the toolbar's Info button, or double-click).
+private struct ProcessInfoView: View {
+    let rows: [ProcessRow]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                Group {
-                    if let icon = row.icon {
-                        Image(nsImage: icon).resizable()
-                    } else {
-                        Image(systemName: "gearshape.fill").font(.system(size: 20)).foregroundStyle(.secondary)
-                    }
-                }
-                .frame(width: 32, height: 32)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(row.name).font(.headline).lineLimit(1)
-                    Text(verbatim: row.isApp ? "Application · \(row.processCount) processes" : "Background process · PID \(row.id)")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 6) {
-                GridRow {
-                    detail("CPU", row.cpu.map { Fmt.percent($0, decimals: 1) } ?? "—")
-                    detail("Memory", row.memory.map { Fmt.memory($0) } ?? "—")
-                }
-                GridRow {
-                    detail("Threads", row.threads.map(String.init) ?? "—")
-                    detail("User", row.user)
-                }
-            }
-            if let lock = row.locked {
-                Label(
-                    lock == .otherUser
-                        ? "Owned by \(row.user). Sonar doesn't end other users' or system processes."
-                        : "Part of your login session. Ending it would log you out, so Sonar won't.",
-                    systemImage: "lock.fill"
-                )
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            } else {
-                VStack(spacing: 6) {
-                    Button {
-                        end(false)
-                    } label: {
-                        Text(row.isApp ? "Quit" : "End Process").frame(maxWidth: .infinity)
-                    }
-                    Button(role: .destructive) {
-                        end(true)
-                    } label: {
-                        Text(row.isApp ? "Force Quit…" : "Force End…").frame(maxWidth: .infinity)
-                    }
-                    if let url = row.executableURL {
-                        Button {
-                            NSWorkspace.shared.activateFileViewerSelecting([url])
-                        } label: {
-                            Text("Show in Finder").frame(maxWidth: .infinity)
+            if rows.count == 1, let row = rows.first {
+                HStack(spacing: 10) {
+                    Group {
+                        if let icon = row.icon {
+                            Image(nsImage: icon).resizable()
+                        } else {
+                            Image(systemName: "gearshape.fill").font(.system(size: 20)).foregroundStyle(.secondary)
                         }
                     }
+                    .frame(width: 32, height: 32)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(row.name).font(.headline).lineLimit(1)
+                        Text(
+                            verbatim: row.isApp
+                                ? "Application · \(row.processCount) processes · PID \(row.id)" : "Background process · PID \(row.id)"
+                        )
+                        .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
-                .controlSize(.large)
+                Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 6) {
+                    GridRow {
+                        detail("CPU", row.cpu.map { Fmt.percent($0, decimals: 1) } ?? "—")
+                        detail("Memory", row.memory.map { Fmt.memory($0) } ?? "—")
+                    }
+                    GridRow {
+                        detail("Threads", row.threads.map(String.init) ?? "—")
+                        detail("User", row.user)
+                    }
+                }
+                if let path = row.executableURL?.path {
+                    Text(path).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(2).textSelection(.enabled)
+                }
+                if let lock = row.locked {
+                    Label(
+                        lock == .otherUser
+                            ? "Owned by \(row.user). Sonar doesn't end other users' or system processes."
+                            : "Part of your login session. Ending it would log you out, so Sonar won't.",
+                        systemImage: "lock.fill"
+                    )
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                Text("\(rows.count) processes").font(.headline)
+                Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 6) {
+                    GridRow {
+                        detail("CPU", Fmt.percent(rows.compactMap(\.cpu).reduce(0, +), decimals: 1))
+                        detail("Memory", Fmt.memory(rows.compactMap(\.memory).reduce(0, +)))
+                    }
+                }
+                Text(rows.prefix(8).map(\.name).joined(separator: ", ") + (rows.count > 8 ? "…" : ""))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(16)
-        .frame(width: 270)
+        .frame(width: 290)
     }
 
     private func detail(_ key: String, _ value: String) -> some View {
