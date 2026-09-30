@@ -198,6 +198,15 @@ struct ProcessesPage: View {
                         .help(row.locked == .otherUser ? "Owned by \(row.user)" : "Part of your login session")
                 }
             }
+            // Anchored to the name, opening below it, so the details appear right where you clicked.
+            .popover(
+                isPresented: Binding(get: { selected == row.id }, set: { if !$0 { selected = nil } }), arrowEdge: .bottom
+            ) {
+                ProcessPopover(row: row) { force in
+                    selected = nil
+                    request(row, force: force)
+                }
+            }
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(row.cpu.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "—").frame(
                 width: Self.widths.cpu, alignment: .trailing)
@@ -211,14 +220,25 @@ struct ProcessesPage: View {
         .monospacedDigit()
         .contentShape(Rectangle())
         .onTapGesture { selected = row.id }
-        .popover(
-            isPresented: Binding(get: { selected == row.id }, set: { if !$0 { selected = nil } }), arrowEdge: .trailing
-        ) {
-            ProcessPopover(row: row) { force in
-                selected = nil
-                if force && confirmForce { pendingForce = row } else { perform(row, force: force) }
+        .contextMenu {
+            if row.locked == nil {
+                Button(row.isApp ? "Quit" : "End Process") { request(row, force: false) }
+                Button(row.isApp ? "Force Quit…" : "Force End…") { request(row, force: true) }
+                Divider()
+            }
+            if let url = row.executableURL {
+                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+            }
+            Button("Copy PID") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(String(row.id), forType: .string)
             }
         }
+    }
+
+    /// Quit/End right away; forceful actions ask first unless that's turned off in Settings.
+    private func request(_ row: ProcessRow, force: Bool) {
+        if force && confirmForce { pendingForce = row } else { perform(row, force: force) }
     }
 
     private func perform(_ row: ProcessRow, force: Bool) {
