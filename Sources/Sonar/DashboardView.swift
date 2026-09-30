@@ -124,6 +124,21 @@ private struct HistoryCard: View {
     var domain: ClosedRange<Double>?
     let axis: (Double) -> String
 
+    /// Samples inside the visible hour, numbered by run. History can reach further back than an hour when the Mac
+    /// slept (no samples while asleep), and a new run starts after each pause so the line doesn't bridge the gap.
+    private var visiblePoints: [(index: Int, run: Int)] {
+        let count = min(times.count, series.map(\.values.count).min() ?? 0)
+        guard let end = times.last else { return [] }
+        let start = end.addingTimeInterval(-3600)
+        var points: [(index: Int, run: Int)] = []
+        var run = 0
+        for i in 0..<count where times[i] >= start {
+            if let last = points.last, times[i].timeIntervalSince(times[last.index]) > 10 { run += 1 }
+            points.append((i, run))
+        }
+        return points
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -131,22 +146,30 @@ private struct HistoryCard: View {
                 Spacer()
                 Text(value).font(.system(size: 15, weight: .semibold, design: .rounded)).monospacedDigit()
             }
+            let points = visiblePoints
             Chart {
                 ForEach(series, id: \.name) { s in
-                    ForEach(0..<min(times.count, s.values.count), id: \.self) { i in
-                        LineMark(x: .value("Time", times[i]), y: .value("Value", s.values[i]), series: .value("Series", s.name))
-                            .foregroundStyle(s.color)
-                            .lineStyle(StrokeStyle(lineWidth: 1.5))
+                    ForEach(points, id: \.index) { p in
+                        LineMark(
+                            x: .value("Time", times[p.index]), y: .value("Value", s.values[p.index]),
+                            series: .value("Series", "\(s.name) \(p.run)")
+                        )
+                        .foregroundStyle(s.color)
+                        .lineStyle(StrokeStyle(lineWidth: 1.5))
                         if series.count == 1 {
-                            AreaMark(x: .value("Time", times[i]), y: .value("Value", s.values[i]))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [s.color.opacity(0.25), s.color.opacity(0)], startPoint: .top, endPoint: .bottom))
+                            AreaMark(
+                                x: .value("Time", times[p.index]), y: .value("Value", s.values[p.index]),
+                                series: .value("Series", "\(s.name) \(p.run)")
+                            )
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [s.color.opacity(0.25), s.color.opacity(0)], startPoint: .top, endPoint: .bottom))
                         }
                     }
                 }
             }
-            .chartYScale(domain: domain ?? 0...max(Double(series.compactMap { $0.values.max() }.max() ?? 1), 1))
+            .chartPlotStyle { $0.clipped() }
+            .chartYScale(domain: domain ?? 0...max(Double(points.flatMap { p in series.map { $0.values[p.index] } }.max() ?? 1), 1))
             .chartXScale(domain: (times.last ?? .now).addingTimeInterval(-3600)...(times.last ?? .now))
             .chartXAxis {
                 AxisMarks(values: .stride(by: .minute, count: 10)) {
