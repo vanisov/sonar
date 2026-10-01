@@ -257,6 +257,7 @@ private struct DashboardSettings: View {
     @AppStorage(Prefs.cpuTempSource) private var hottest = false
     @AppStorage(Prefs.confirmForce) private var confirmForce = true
     @AppStorage(Prefs.showSystemProcesses) private var showSystem = true
+    @AppStorage(Prefs.cleanDownloadsDays) private var downloadsDays = 90
 
     var body: some View {
         Form {
@@ -296,9 +297,19 @@ private struct DashboardSettings: View {
                 Text("macOS doesn't let Sonar read or end other users' processes, so they're listed with a lock.")
                     .foregroundStyle(.secondary)
             }
+            Section {
+                Picker("Old downloads are files untouched for", selection: $downloadsDays) {
+                    ForEach([30, 90, 180, 365], id: \.self) { Text("\($0) days").tag($0) }
+                }
+            } header: {
+                Text("Clean Up")
+            } footer: {
+                Text("Clean Up only moves files to the Trash, and never preselects downloads.")
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
-        .frame(height: 530)
+        .frame(height: 600)
     }
 }
 

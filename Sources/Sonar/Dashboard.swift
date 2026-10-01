@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
-    case overview, cpu, gpu, memory, disk, network, sensors, fans, apps, system
+    case overview, cpu, gpu, memory, disk, network, sensors, fans, apps, cleanUp, system
 
     static let metrics: [DashboardSection] = [.cpu, .gpu, .memory, .disk, .network, .sensors, .fans]
     var id: Self { self }
@@ -18,6 +18,7 @@ enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
         case .sensors: "Sensors"
         case .fans: "Fans"
         case .apps: "Processes"
+        case .cleanUp: "Clean Up"
         case .system: "This Mac"
         }
     }
@@ -33,13 +34,14 @@ enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
         case .sensors: "thermometer.medium"
         case .fans: "fan"
         case .apps: "list.bullet.rectangle"
+        case .cleanUp: "sparkles"
         case .system: "laptopcomputer"
         }
     }
 
     var tint: Color {
         switch self {
-        case .overview, .apps, .system: .signal
+        case .overview, .apps, .cleanUp, .system: .signal
         case .cpu: .blue
         case .gpu: .pink
         case .memory: .purple
@@ -66,7 +68,7 @@ enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
     static var monitor: Monitor?
     private static var window: NSWindow?
 
-    static func show(_ section: DashboardSection?) {
+    static func show(_ section: DashboardSection?, activate: Bool = true) {
         guard let monitor else { return }
         let nav = DashboardNavigation.shared
         if let section {
@@ -77,7 +79,7 @@ enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
             nav.section = DashboardSection(rawValue: key) ?? .overview
         }
         if window == nil {
-            if Prefs.bool(Prefs.showInDock, default: true) { NSApp.setActivationPolicy(.regular) }
+            if activate, Prefs.bool(Prefs.showInDock, default: true) { NSApp.setActivationPolicy(.regular) }
             let host = NSHostingController(rootView: DashboardView(monitor: monitor))
             host.sceneBridgingOptions = .all  // lets SwiftUI install the toolbar, title and search field
             let w = NSWindow(contentViewController: host)
@@ -95,15 +97,22 @@ enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
                     (note.object as? NSWindow)?.contentViewController = nil
                     window = nil
                     DashboardNavigation.shared.query = ""
+                    Cleaner.shared.reset()
                     NSApp.setActivationPolicy(.accessory)
                     resignActiveIfNoWindows(closing: note.object as? NSWindow)
                 }
             }
             window = w
         }
+        guard activate else {
+            window?.orderBack(nil)  // screenshots: on screen but behind everything, without taking focus
+            return
+        }
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
     }
+
+    static var windowNumber: Int? { window?.windowNumber }
 }
 
 struct DashboardView: View {
@@ -154,13 +163,14 @@ struct DashboardView: View {
 
     private var showsRange: Bool {
         guard nav.query.isEmpty, let s = nav.section else { return false }
-        return s != .apps && s != .system && s != .sensors
+        return s != .apps && s != .cleanUp && s != .system && s != .sensors
     }
 
     private var subtitle: String {
         guard nav.query.isEmpty || nav.section == .apps else { return "" }
         switch nav.section ?? .overview {
         case .system: return "About this Mac"
+        case .cleanUp: return "Moves files to the Trash"
         case .apps: return monitor.processes.isEmpty ? "Running now" : "\(monitor.processes.count) running"
         case .sensors: return "\(monitor.sensors.count) sensors"
         default: return (TimeRange(rawValue: range) ?? .fifteenMinutes).long
@@ -180,7 +190,10 @@ struct DashboardView: View {
             } header: {
                 BrandLockup().padding(.top, 6).padding(.bottom, 26)
             }
-            Section("Manage") { row(.apps).tag(DashboardSection.apps) }
+            Section("Manage") {
+                row(.apps).tag(DashboardSection.apps)
+                row(.cleanUp).tag(DashboardSection.cleanUp)
+            }
             Section("Mac") { row(.system).tag(DashboardSection.system) }
         }
         .listStyle(.sidebar)
@@ -226,6 +239,7 @@ struct DashboardView: View {
             case .sensors: SensorsPage(sensors: monitor.sensors)
             case .fans: FansPage(monitor: monitor)
             case .apps: ProcessesPage(monitor: monitor, query: nav.query)
+            case .cleanUp: ScrollView { CleanUpCard().padding(20) }
             case .system: ThisMacPage(monitor: monitor)
             }
         }

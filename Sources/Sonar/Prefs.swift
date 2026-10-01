@@ -34,6 +34,9 @@ enum Prefs {
     static let confirmForce = "confirmForceQuit"
     static let showSystemProcesses = "showSystemProcesses"
 
+    // Clean Up
+    static let cleanDownloadsDays = "cleanDownloadsDays"
+
     // Units
     static let temperatureUnit = TemperatureUnit.storageKey
     static let storageBinary = "storageBinary"

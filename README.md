@@ -24,6 +24,11 @@
   &nbsp;
   <img src="docs/dashboard.png" alt="Sonar's dashboard: sidebar with every metric, paired usage and temperature charts, and a time range picker" width="560" />
 </p>
+<p align="center">
+  <img src="docs/processes.png" alt="Sonar's Processes page: All, Applications and Background tabs, a control bar with Quit, Force Quit, Show in Finder and Info, and a sortable process table" width="430" />
+  &nbsp;
+  <img src="docs/cleanup.png" alt="Sonar's Clean Up page: app caches, logs, package manager caches and Xcode build data with their sizes, and a Move to Trash button" width="430" />
+</p>
 
 **your mac, at a glance.** a tiny, native menu bar monitor for Apple silicon.
 
@@ -36,7 +41,8 @@
 - **real temperatures** — CPU and GPU temperatures straight from the SMC, in °C or °F, averaged or hottest-core. sensors are discovered per chip at launch instead of hard-coded tables (developed on an M4 Pro, reports from other chips welcome).
 - **your menu bar, your way** — pick any mix of CPU %, temperatures, memory, network and fan speed, reorder them, show icons or values, and have them turn orange or red when something needs attention.
 - **full control** — a proper Settings window (⌘,) for the menu bar, panel, dashboard, units, a global keyboard shortcut, and appearance.
-- **a task manager that's pleasant to use** — every app and background process, sortable and searchable by name or PID. click one to quit or force quit it, and apps show their real total with helpers included. other users' and system processes are locked, so you can't end something your Mac needs.
+- **a task manager that's pleasant to use** — every app and background process, sortable and searchable by name or PID. select one or several and use the control bar to quit, force quit, show in Finder or see details. apps show their real total with helpers included, and other users' and system processes are locked, so you can't end something your Mac needs.
+- **clean up** — finds app caches, logs, package manager caches (Homebrew, npm, Yarn, pip…), Xcode build data and old downloads, shows exactly how big each is, and moves what you pick to the Trash. nothing is deleted until you empty it, caches of running apps are skipped, old downloads are never preselected, and it only ever looks inside your home folder.
 - **light on your mac** — about 0.5% of one core when idle, no helper tools, no root, no telemetry. expensive readings only run while you're looking, and windows are torn down when you close them.
 - **100% Swift** — SwiftUI, AppKit and Swift Charts, no dependencies.
 

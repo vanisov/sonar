@@ -13,7 +13,8 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first. It applies to you too.
 | `Sources/Sonar/Dashboard.swift` | Dashboard window, sidebar, toolbar, search |
 | `Sources/Sonar/DashboardPages.swift` | Overview and the metric pages |
 | `Sources/Sonar/HistoryChart.swift` | Time-range charts and min/avg/max |
-| `Sources/Sonar/ProcessesPage.swift` | Processes page: table, per-row popover, Quit/End actions |
+| `Sources/Sonar/ProcessesPage.swift` | Processes page: table, control bar, Quit/End actions |
+| `Sources/Sonar/CleanUp.swift` | Clean Up page: finds reclaimable space and moves picks to the Trash |
 | `Sources/Sonar/ThisMac.swift` | This Mac page and the hardware/battery/network facts behind it |
 | `Sources/Sonar/SettingsWindow.swift` | Settings window and its tabs |
 | `Sources/Sonar/Prefs.swift` | Every setting's key and default, plus unit-aware formatting |
