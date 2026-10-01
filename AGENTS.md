@@ -37,4 +37,5 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first. It applies to you too.
 - **Network access is opt-in only.** The update check is the one request Sonar makes, and it's off by default.
 - Verify UI changes by running the app and looking at it, not only by building.
 - Format and lint with `swift-format` (see CONTRIBUTING.md) before committing.
-- Don't bump versions or edit tags by hand outside the process in [docs/RELEASING.md](docs/RELEASING.md).
+- Don't push tags or create releases by hand: merging a PR with a `Release X.Y.Z` changelog section releases it
+  (see [docs/RELEASING.md](docs/RELEASING.md)). Never merge your own PRs.

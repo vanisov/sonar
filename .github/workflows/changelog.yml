@@ -1,0 +1,28 @@
+name: Changelog
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: App changes need a changelog line
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          SKIP: ${{ contains(github.event.pull_request.labels.*.name, 'skip-changelog') }}
+        run: |
+          if [ "$SKIP" = true ]; then
+            echo "skip-changelog label set; not checking."
+            exit 0
+          fi
+          CHANGED=$(git diff --name-only "$BASE"...HEAD)
+          if echo "$CHANGED" | grep -q '^Sources/' && ! echo "$CHANGED" | grep -qx 'CHANGELOG.md'; then
+            echo "::error file=CHANGELOG.md::This PR changes Sources/ but not CHANGELOG.md. Add a line under ## [Unreleased], or add the skip-changelog label if nothing user-facing changed."
+            exit 1
+          fi
+          echo "OK"
