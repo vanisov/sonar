@@ -8,6 +8,16 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-01
+
+### Added
+- Clean Up in the dashboard sidebar: finds app caches, logs and crash reports, package manager caches (Homebrew,
+  npm, Yarn, pip, CocoaPods, Go, Bun, pnpm), Xcode build data, device support files, Xcode archives and old
+  downloads, with the size of each and every item inside. What you pick moves to the Trash, so nothing is gone
+  until you empty it. Caches of running apps and Apple's own caches are skipped, archives and old downloads are
+  never preselected, and only your home folder is scanned, only when you click Scan.
+- Settings → Dashboard → Clean Up: how old a download must be to count as old (30, 90, 180 or 365 days).
+
 ## [1.4.1] - 2026-09-30
 
 ### Fixed
@@ -106,7 +116,8 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 - Choice of stats in the menu bar, and launch at login.
 - Dashboard with an hour of history, every temperature sensor, and all running apps.
 
-[Unreleased]: https://github.com/vanisov/sonar/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/vanisov/sonar/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/vanisov/sonar/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/vanisov/sonar/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/vanisov/sonar/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/vanisov/sonar/compare/v1.3.1...v1.3.2
