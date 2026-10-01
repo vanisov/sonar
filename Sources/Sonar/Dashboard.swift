@@ -58,7 +58,7 @@ enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
         didSet { if let section { UserDefaults.standard.set(section.rawValue, forKey: Prefs.dashboardLastSection) } }
     }
     var query = ""
-    var diskCleanUp = false  // the Disk page's Clean Up tab; the toolbar hides the time range for it
+    var diskCleanUp = false  // the Disk page's Clean Up tab
 }
 
 /// Created on demand and torn down on close. A SwiftUI `Window` scene stays alive offscreen
@@ -163,14 +163,13 @@ struct DashboardView: View {
 
     private var showsRange: Bool {
         guard nav.query.isEmpty, let s = nav.section else { return false }
-        return s != .apps && s != .system && s != .sensors && !(s == .disk && nav.diskCleanUp)
+        return s != .apps && s != .system && s != .sensors
     }
 
     private var subtitle: String {
         guard nav.query.isEmpty || nav.section == .apps else { return "" }
         switch nav.section ?? .overview {
         case .system: return "About this Mac"
-        case .disk where nav.diskCleanUp: return "Moves files to the Trash"
         case .apps: return monitor.processes.isEmpty ? "Running now" : "\(monitor.processes.count) running"
         case .sensors: return "\(monitor.sensors.count) sensors"
         default: return (TimeRange(rawValue: range) ?? .fifteenMinutes).long

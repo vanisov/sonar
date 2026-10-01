@@ -422,7 +422,10 @@ struct DiskPage: View {
     @Bindable private var nav = DashboardNavigation.shared
 
     var body: some View {
-        VStack(spacing: 0) {
+        let m = monitor
+        let used = m.diskTotal - m.diskFree
+        // The tabs scroll with the page, so the toolbar looks and behaves like every other page's.
+        page {
             HStack {
                 Picker("Show", selection: $nav.diskCleanUp) {
                     Text("Usage").tag(false)
@@ -433,40 +436,35 @@ struct DiskPage: View {
                 .fixedSize()
                 Spacer()
             }
-            .padding(.horizontal, 20).padding(.top, 10)
             if nav.diskCleanUp {
-                ScrollView { CleanUpCard().padding(20) }
+                CleanUpCard()
             } else {
-                usage
+                usage(m, used: used)
             }
         }
     }
 
-    private var usage: some View {
-        let m = monitor
-        let used = m.diskTotal - m.diskFree
-        return page {
-            DashCard(title: "Macintosh HD", symbol: "internaldrive", tint: .orange, trailing: "startup disk") {
-                BigValue(value: Fmt.storage(m.diskFree), caption: "available")
-                UsageBar(fraction: m.diskTotal > 0 ? Double(used) / Double(m.diskTotal) : 0, color: .orange)
-                LazyVGrid(columns: two, spacing: 0) {
-                    keyValue("Used", Fmt.storage(used))
-                    keyValue("Capacity", Fmt.storage(m.diskTotal))
-                }
+    @ViewBuilder private func usage(_ m: Monitor, used: Int64) -> some View {
+        DashCard(title: "Macintosh HD", symbol: "internaldrive", tint: .orange, trailing: "startup disk") {
+            BigValue(value: Fmt.storage(m.diskFree), caption: "available")
+            UsageBar(fraction: m.diskTotal > 0 ? Double(used) / Double(m.diskTotal) : 0, color: .orange)
+            LazyVGrid(columns: two, spacing: 0) {
+                keyValue("Used", Fmt.storage(used))
+                keyValue("Capacity", Fmt.storage(m.diskTotal))
             }
-            DashCard(title: "Activity", symbol: "arrow.up.arrow.down", tint: .orange, trailing: "all disks") {
-                HStack(spacing: 24) {
-                    BigValue(value: Fmt.rate(m.diskRead), caption: "Read", dot: .orange)
-                    BigValue(value: Fmt.rate(m.diskWrite), caption: "Write", dot: .blue)
-                }
-                HistoryChart(
-                    times: m.times,
-                    series: [
-                        ChartSeries(name: "Read", values: m.diskReadHistory, color: .orange),
-                        ChartSeries(name: "Write", values: m.diskWriteHistory, color: .blue),
-                    ],
-                    height: 210, axis: { Fmt.rate($0) })
+        }
+        DashCard(title: "Activity", symbol: "arrow.up.arrow.down", tint: .orange, trailing: "all disks") {
+            HStack(spacing: 24) {
+                BigValue(value: Fmt.rate(m.diskRead), caption: "Read", dot: .orange)
+                BigValue(value: Fmt.rate(m.diskWrite), caption: "Write", dot: .blue)
             }
+            HistoryChart(
+                times: m.times,
+                series: [
+                    ChartSeries(name: "Read", values: m.diskReadHistory, color: .orange),
+                    ChartSeries(name: "Write", values: m.diskWriteHistory, color: .blue),
+                ],
+                height: 210, axis: { Fmt.rate($0) })
         }
     }
 }
