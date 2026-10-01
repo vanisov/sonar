@@ -68,10 +68,12 @@ struct SonarApp: App {
     }
 
     /// Debug aid for README screenshots: `Sonar --open-dashboard disk` opens the dashboard behind every other window
-    /// without taking focus and prints its window number, for `screencapture -l <number>`.
+    /// without taking focus and prints its window number, for `screencapture -l <number>`. Add `--scan` to open Disk's
+    /// Clean Up tab and start a scan.
     private func openDashboardBehind(_ section: String) {
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1))
+            DashboardNavigation.shared.diskCleanUp = CommandLine.arguments.contains("--scan")  // Disk → Clean Up, scanning
             DashboardWindow.show(DashboardSection(rawValue: section) ?? .overview, activate: false)
             print("window", DashboardWindow.windowNumber ?? 0)
             fflush(stdout)

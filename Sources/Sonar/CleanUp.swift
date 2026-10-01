@@ -14,7 +14,6 @@ struct CleanCategory: Identifiable {
     let title: String
     let detail: String
     let symbol: String
-    var preselected = true
     var items: [CleanItem] = []
     var size: Int64 { items.reduce(0) { $0 + $1.size } }
 }
@@ -45,10 +44,9 @@ struct CleanCategory: Identifiable {
         phase = .scanning("")
         categories = []
         selection = []
-        let days = Prefs.int(Prefs.cleanDownloadsDays, default: 90)
         let running = NSWorkspace.shared.runningApplications.map { (id: $0.bundleIdentifier, name: $0.localizedName) }
         Task.detached(priority: .utility) {
-            for (title, find) in CleanScanner.categories(downloadsDays: days, running: running) {
+            for (title, find) in CleanScanner.categories(running: running) {
                 // Stop if the dashboard closed (reset) mid-scan.
                 guard await MainActor.run(body: { self.isScanning }) else { return }
                 await MainActor.run { self.phase = .scanning(title) }
@@ -66,7 +64,7 @@ struct CleanCategory: Identifiable {
     private func add(_ category: CleanCategory) {
         guard !category.items.isEmpty else { return }
         categories.append(category)
-        if category.preselected { selection.formUnion(category.items.map(\.url)) }
+        selection.formUnion(category.items.map(\.url))
     }
 
     func reset() {
@@ -133,7 +131,7 @@ enum CleanScanner {
     /// Not caches despite living in Caches: nothing downloads these again by itself.
     private static let keep = ["ms-playwright"]
 
-    static func categories(downloadsDays: Int, running: [(id: String?, name: String?)]) -> [(String, () -> CleanCategory)] {
+    static func categories(running: [(id: String?, name: String?)]) -> [(String, () -> CleanCategory)] {
         let packageNames = Set(packageCaches.map { ($0.1 as NSString).lastPathComponent })
         return [
             (
@@ -202,31 +200,6 @@ enum CleanScanner {
                         detail: "Xcode downloads them again when you connect a device.", symbol: "iphone", items: sizedItems)
                 }
             ),
-            (
-                "Xcode",
-                {
-                    CleanCategory(
-                        id: "archives", title: "Xcode archives", detail: "Keep any you need to read crash reports. Not preselected.",
-                        symbol: "archivebox.circle", preselected: false,
-                        items: sized(children(of: xcode.appending(path: "Archives"))))
-                }
-            ),
-            (
-                "Downloads",
-                {
-                    let cutoff = Date.now.addingTimeInterval(-Double(downloadsDays) * 86400)
-                    let keys: Set<URLResourceKey> = [.contentModificationDateKey, .contentAccessDateKey, .addedToDirectoryDateKey]
-                    let old = children(of: home.appending(path: "Downloads")).filter { url in
-                        guard let v = try? url.resourceValues(forKeys: keys) else { return false }
-                        let touched = [v.contentModificationDate, v.contentAccessDate, v.addedToDirectoryDate].compactMap { $0 }.max()
-                        return touched.map { $0 < cutoff } ?? false
-                    }
-                    return CleanCategory(
-                        id: "downloads", title: "Old downloads",
-                        detail: "Untouched for \(downloadsDays) days. Never preselected: tick what can go.", symbol: "arrow.down.circle",
-                        preselected: false, items: sized(old))
-                }
-            ),
         ]
     }
 
@@ -234,23 +207,32 @@ enum CleanScanner {
         (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)) ?? []
     }
 
-    /// Items with their size on disk, largest first. Empty ones are dropped.
+    /// Items with their size on disk, largest first. Empty ones are dropped, and so is anything written to in the last
+    /// hour: something (an app, a command-line tool, a system service) is using it right now.
     private static func sized(_ urls: [URL]) -> [CleanItem] {
-        urls.map { CleanItem(url: $0, name: $0.lastPathComponent, size: allocatedSize($0)) }
-            .filter { $0.size > 0 }
-            .sorted { $0.size > $1.size }
+        let inUse = Date.now.addingTimeInterval(-3600)
+        return urls.compactMap { url in
+            let (size, lastWrite) = scan(url)
+            return size > 0 && lastWrite < inUse ? CleanItem(url: url, name: url.lastPathComponent, size: size) : nil
+        }
+        .sorted { $0.size > $1.size }
     }
 
-    static func allocatedSize(_ url: URL) -> Int64 {
-        let keys: [URLResourceKey] = [.totalFileAllocatedSizeKey, .isDirectoryKey]
-        guard let v = try? url.resourceValues(forKeys: Set(keys)) else { return 0 }
-        guard v.isDirectory == true else { return Int64(v.totalFileAllocatedSize ?? 0) }
-        var total: Int64 = 0
-        let files = FileManager.default.enumerator(at: url, includingPropertiesForKeys: keys, options: [], errorHandler: { _, _ in true })
+    /// Size on disk and the newest modification date of a file or everything inside a folder.
+    static func scan(_ url: URL) -> (size: Int64, lastWrite: Date) {
+        let keys: Set<URLResourceKey> = [.totalFileAllocatedSizeKey, .contentModificationDateKey, .isDirectoryKey]
+        guard let v = try? url.resourceValues(forKeys: keys) else { return (0, .distantPast) }
+        var size = Int64(v.totalFileAllocatedSize ?? 0)
+        var lastWrite = v.contentModificationDate ?? .distantPast
+        guard v.isDirectory == true else { return (size, lastWrite) }
+        let files = FileManager.default.enumerator(
+            at: url, includingPropertiesForKeys: Array(keys), options: [], errorHandler: { _, _ in true })
         while let file = files?.nextObject() as? URL {
-            total += Int64((try? file.resourceValues(forKeys: [.totalFileAllocatedSizeKey]))?.totalFileAllocatedSize ?? 0)
+            guard let f = try? file.resourceValues(forKeys: keys) else { continue }
+            size += Int64(f.totalFileAllocatedSize ?? 0)
+            if let date = f.contentModificationDate, date > lastWrite { lastWrite = date }
         }
-        return total
+        return (size, lastWrite)
     }
 }
 

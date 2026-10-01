@@ -419,11 +419,33 @@ func keyValue(_ key: String, _ value: String, dot: Color? = nil) -> some View {
 
 struct DiskPage: View {
     let monitor: Monitor
+    @Bindable private var nav = DashboardNavigation.shared
 
     var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Picker("Show", selection: $nav.diskCleanUp) {
+                    Text("Usage").tag(false)
+                    Text("Clean Up").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                Spacer()
+            }
+            .padding(.horizontal, 20).padding(.top, 10)
+            if nav.diskCleanUp {
+                ScrollView { CleanUpCard().padding(20) }
+            } else {
+                usage
+            }
+        }
+    }
+
+    private var usage: some View {
         let m = monitor
         let used = m.diskTotal - m.diskFree
-        page {
+        return page {
             DashCard(title: "Macintosh HD", symbol: "internaldrive", tint: .orange, trailing: "startup disk") {
                 BigValue(value: Fmt.storage(m.diskFree), caption: "available")
                 UsageBar(fraction: m.diskTotal > 0 ? Double(used) / Double(m.diskTotal) : 0, color: .orange)

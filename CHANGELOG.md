@@ -11,12 +11,11 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 ## [1.5.0] - 2026-10-01
 
 ### Added
-- Clean Up in the dashboard sidebar: finds app caches, logs and crash reports, package manager caches (Homebrew,
-  npm, Yarn, pip, CocoaPods, Go, Bun, pnpm), Xcode build data, device support files, Xcode archives and old
-  downloads, with the size of each and every item inside. What you pick moves to the Trash, so nothing is gone
-  until you empty it. Caches of running apps and Apple's own caches are skipped, archives and old downloads are
-  never preselected, and only your home folder is scanned, only when you click Scan.
-- Settings → Dashboard → Clean Up: how old a download must be to count as old (30, 90, 180 or 365 days).
+- Clean Up, a tab on the Disk page: finds app caches, logs and crash reports, package manager caches (Homebrew,
+  npm, Yarn, pip, CocoaPods, Go, Bun, pnpm), Xcode build data and device support files, with the size of each and
+  every item inside. What you pick moves to the Trash, so nothing is gone until you empty it. It only lists things
+  that are rebuilt or downloaded again automatically, and skips caches of running apps, Apple's own caches, and
+  anything written to in the last hour. It scans only your home folder, and only when you click Scan.
 
 ## [1.4.1] - 2026-09-30
 
