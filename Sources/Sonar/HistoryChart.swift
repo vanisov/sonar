@@ -27,15 +27,29 @@ enum TimeRange: Int, CaseIterable, Identifiable {
         }
     }
 
-    /// Spacing of the time axis labels.
-    var tick: (component: Calendar.Component, count: Int) {
+    /// Spacing of the time axis labels, in seconds.
+    var tickSeconds: Double {
         switch self {
-        case .minute: (.second, 15)
-        case .fiveMinutes: (.minute, 1)
-        case .fifteenMinutes: (.minute, 5)
-        case .halfHour: (.minute, 10)
-        case .hour: (.minute, 15)
+        case .minute: 15
+        case .fiveMinutes: 60
+        case .fifteenMinutes: 300
+        case .halfHour: 600
+        case .hour: 900
         }
+    }
+
+    /// Clock-aligned tick times (e.g. 3:35, 3:40…) inside the range, leaving out any close enough to the right
+    /// edge that its label would be cut off.
+    func ticks(endingAt end: Date) -> [Date] {
+        let start = end.timeIntervalSince1970 - Double(rawValue)
+        let last = end.timeIntervalSince1970 - Double(rawValue) * 0.12
+        var t = (start / tickSeconds).rounded(.up) * tickSeconds
+        var ticks: [Date] = []
+        while t <= last {
+            ticks.append(Date(timeIntervalSince1970: t))
+            t += tickSeconds
+        }
+        return ticks
     }
 }
 
@@ -127,11 +141,11 @@ struct HistoryChart: View {
                 }
             }
         }
-        .chartPlotStyle { $0.clipped().padding(.trailing, 34) }  // room for the newest time label
+        .chartPlotStyle { $0.clipped() }
         .chartXScale(domain: end.addingTimeInterval(-Double(range))...end)
         .chartYScale(domain: (domain?.lowerBound ?? 0)...top)
         .chartXAxis {
-            AxisMarks(values: .stride(by: timeRange.tick.component, count: timeRange.tick.count)) {
+            AxisMarks(values: timeRange.ticks(endingAt: end)) {
                 AxisGridLine()
                 AxisValueLabel(format: timeRange == .minute ? .dateTime.hour().minute().second() : .dateTime.hour().minute())
             }

@@ -8,6 +8,11 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-09-30
+
+### Fixed
+- The newest time label on dashboard charts was cut off at the right edge. Charts also use their full width again.
+
 ## [1.4.0] - 2026-09-30
 
 ### Added
@@ -101,7 +106,8 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 - Choice of stats in the menu bar, and launch at login.
 - Dashboard with an hour of history, every temperature sensor, and all running apps.
 
-[Unreleased]: https://github.com/vanisov/sonar/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/vanisov/sonar/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/vanisov/sonar/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/vanisov/sonar/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/vanisov/sonar/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/vanisov/sonar/compare/v1.3.0...v1.3.1

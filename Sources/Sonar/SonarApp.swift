@@ -10,8 +10,12 @@ struct SonarApp: App {
         Appearance(rawValue: Prefs.string(Prefs.appearance, default: "system"))?.apply()
         Hotkeys.reload()
         Updater.shared.startAutomaticChecks()
-        if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLine.arguments.count {
-            snapshot(to: CommandLine.arguments[i + 1])
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count {
+            snapshot(to: args[i + 1])
+        }
+        if let i = args.firstIndex(of: "--snapshot-dashboard"), i + 1 < args.count {
+            snapshotDashboard(to: args[i + 1], seconds: i + 2 < args.count ? Int(args[i + 2]) ?? 20 : 20)
         }
     }
 
@@ -26,6 +30,37 @@ struct SonarApp: App {
             CommandGroup(replacing: .appSettings) {
                 Button("Settings…") { SettingsWindow.open() }.keyboardShortcut(",")
             }
+        }
+    }
+
+    /// Debug aid: `Sonar --snapshot-dashboard charts.png [seconds]` renders the dashboard's CPU and network charts
+    /// offscreen after collecting that many seconds of samples, then quits. No windows open and no input is needed.
+    /// (Charts only: ImageRenderer can't draw the pages' scroll views.)
+    private func snapshotDashboard(to path: String, seconds: Int) {
+        let monitor = monitor
+        Task { @MainActor in
+            monitor.viewAppeared()
+            try? await Task.sleep(for: .seconds(seconds))
+            let renderer = ImageRenderer(
+                content: VStack(spacing: 24) {
+                    HistoryChart(
+                        times: monitor.times, series: [ChartSeries(name: "CPU", values: monitor.cpuHistory, color: .blue)],
+                        domain: 0...100, height: 180, axis: { Fmt.percent($0) })
+                    HistoryChart(
+                        times: monitor.times, series: [ChartSeries(name: "Down", values: monitor.downHistory, color: .green)],
+                        height: 180, axis: { Fmt.rate($0) })
+                }
+                .padding(24)
+                .frame(width: 520)
+                .background(Color(white: 0.13))
+                .environment(\.colorScheme, .dark))
+            renderer.scale = 2
+            if let tiff = renderer.nsImage?.tiffRepresentation,
+                let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
+            {
+                try? png.write(to: URL(fileURLWithPath: path))
+            }
+            exit(0)
         }
     }
 
