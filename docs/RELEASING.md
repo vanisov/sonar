@@ -22,20 +22,23 @@ for long; users download from the Releases page, not from source.
 
 ## How to release
 
-1. Make sure `main` is green in CI.
-2. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add a fresh empty
-   `## [Unreleased]` above it, and update the compare links at the bottom.
-3. Commit: `git commit -am "Release X.Y.Z"`.
-4. Tag and push:
-   ```bash
-   git tag vX.Y.Z
-   git push origin main vX.Y.Z
-   ```
-5. The [release workflow](../.github/workflows/release.yml) builds `Sonar.zip` on a clean macOS runner
-   and publishes the GitHub release, using that version's changelog section as the release notes.
-6. Check the release page, download the zip, and make sure it opens.
+Releases happen by merging. No one tags by hand.
 
-## Before tagging, check
+1. In the PR that should ship (or a separate one), rename `## [Unreleased]` in `CHANGELOG.md` to
+   `## [X.Y.Z] - YYYY-MM-DD`, add a fresh empty `## [Unreleased]` above it, update the compare links at the
+   bottom, and commit it as `Release X.Y.Z`.
+2. Merge the PR once CI is green.
+3. The [release workflow](../.github/workflows/release.yml) sees a changelog version that isn't tagged yet,
+   builds `Sonar.zip` on a clean macOS runner, creates the `vX.Y.Z` tag on the merge commit, and publishes the
+   GitHub release with that version's changelog section as the notes.
+4. Check the release page, download the zip, and make sure it opens.
+
+Merges without a new version section (everything else) build in CI but don't release anything.
+
+If a release ever needs to be redone, push the tag yourself (`git tag vX.Y.Z && git push origin vX.Y.Z`);
+the same workflow rebuilds and republishes it.
+
+## Before merging a release, check
 
 - `./perf.sh` stays within budget with the panel closed (after opening and closing the panel and dashboard once).
 - The panel, settings, and dashboard open and close cleanly.

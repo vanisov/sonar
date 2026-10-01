@@ -37,7 +37,8 @@ CI runs the lint and the build on every PR.
 
 - One change per PR. Small PRs get reviewed faster.
 - Describe what changed and why, and attach a screenshot for anything visible.
-- If it's user-facing, add a line under `## [Unreleased]` in [`CHANGELOG.md`](CHANGELOG.md).
+- If it's user-facing, add a line under `## [Unreleased]` in [`CHANGELOG.md`](CHANGELOG.md). CI fails a PR that
+  changes `Sources/` without touching the changelog; add the `skip-changelog` label for changes users won't notice.
 - Performance changes: include `./perf.sh` output from before and after.
 
 ## Code style

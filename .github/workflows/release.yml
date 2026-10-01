@@ -1,26 +1,61 @@
 name: Release
 
+# Merging a PR that adds a new version section to CHANGELOG.md (e.g. "## [1.5.0] - …") releases it:
+# this workflow tags that commit and publishes the build. Pushing a vX.Y.Z tag by hand still works too.
 on:
   push:
+    branches: [main]
     tags: ["v*.*.*"]
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Find a version to release
+        id: version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # On main: the newest version in the changelog, unless it's already tagged.
+          VERSION=$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+          if [ -z "$VERSION" ] || git rev-parse -q --verify "refs/tags/v$VERSION" > /dev/null; then
+            echo "Nothing to release: the newest changelog version (${VERSION:-none}) is already tagged."
+            exit 0
+          fi
+          echo "Releasing $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
   release:
+    needs: check
+    if: needs.check.outputs.version != ''
     runs-on: macos-26
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      TAG: v${{ needs.check.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Build
-        run: DEVELOPER_DIR="$(xcode-select -p)" VERSION="${GITHUB_REF_NAME#v}" ./bundle.sh
+        run: DEVELOPER_DIR="$(xcode-select -p)" ./bundle.sh
 
       - name: Release notes from CHANGELOG.md
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
           awk -v v="$VERSION" '$0 ~ "^## \\[" v "\\]" { found = 1; next } /^## \[/ { found = 0 } found' CHANGELOG.md > notes.md
           if [ ! -s notes.md ]; then
             echo "CHANGELOG.md has no section for $VERSION" >&2
@@ -37,9 +72,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" build/Sonar.zip --clobber
-            gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" build/Sonar.zip --clobber
+            gh release edit "$TAG" --notes-file notes.md
           else
-            gh release create "$GITHUB_REF_NAME" build/Sonar.zip --title "Sonar ${GITHUB_REF_NAME#v}" --notes-file notes.md --verify-tag
+            # Creates the tag on this commit when it doesn't exist yet (releases from a merge to main).
+            gh release create "$TAG" build/Sonar.zip --title "Sonar $VERSION" --notes-file notes.md --target "$GITHUB_SHA"
           fi
