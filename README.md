@@ -37,7 +37,7 @@
 ## features
 
 - **everything in one glance** — CPU, GPU, memory, disk, network, fans and your hungriest apps, in one panel that feels like it shipped with macOS.
-- **a real dashboard** — a page for every metric with charts over 1 minute to 1 hour, min / average / max, every CPU core, where your memory goes, disk activity, network interfaces, fans, and an About-this-Mac page with battery health. search it all with ⌘F.
+- **a real dashboard** — a page for every metric with charts over 1 minute to 1 hour, min / average / max, every CPU core, where your memory goes, what your storage is used by (in the same categories as System Settings), disk activity, network interfaces, fans, and an About-this-Mac page with battery health. search it all with ⌘F.
 - **real temperatures** — CPU and GPU temperatures straight from the SMC, in °C or °F, averaged or hottest-core. sensors are discovered per chip at launch instead of hard-coded tables (developed on an M4 Pro, reports from other chips welcome).
 - **your menu bar, your way** — pick any mix of CPU %, temperatures, memory, network and fan speed, reorder them, show icons or values, and have them turn orange or red when something needs attention.
 - **full control** — a proper Settings window (⌘,) for the menu bar, panel, dashboard, units, a global keyboard shortcut, and appearance.

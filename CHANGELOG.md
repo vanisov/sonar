@@ -8,6 +8,18 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-01
+
+### Added
+- The Disk page shows what's using your storage, in the categories System Settings uses: Applications, Documents,
+  Photos, Music, Movies, iCloud Drive, Developer, macOS and System Data, as a colored bar with a legend. The first
+  calculation asks for access to Desktop, Documents and Downloads. A full pass reads every file in your home folder,
+  so it runs in the background at low priority, is kept across launches, and is redone at most once a day, or when
+  you click Recalculate.
+- System Data is broken down too: app data, caches, hidden folders in your home, apps and tools for all users,
+  downloaded system assets, system files, macOS support volumes, and snapshots and other space Sonar can't
+  attribute. Used and Capacity moved up next to the available space.
+
 ## [1.5.0] - 2026-10-01
 
 ### Added
@@ -115,7 +127,8 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 - Choice of stats in the menu bar, and launch at login.
 - Dashboard with an hour of history, every temperature sensor, and all running apps.
 
-[Unreleased]: https://github.com/vanisov/sonar/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/vanisov/sonar/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/vanisov/sonar/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/vanisov/sonar/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/vanisov/sonar/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/vanisov/sonar/compare/v1.3.2...v1.4.0

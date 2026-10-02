@@ -34,6 +34,10 @@ enum Prefs {
     static let confirmForce = "confirmForceQuit"
     static let showSystemProcesses = "showSystemProcesses"
 
+    // Disk
+    static let storageBreakdown = "storageBreakdown"  // last measured category sizes, [category: bytes]
+    static let storageBreakdownDate = "storageBreakdownDate"
+
     // Units
     static let temperatureUnit = TemperatureUnit.storageKey
     static let storageBinary = "storageBinary"
