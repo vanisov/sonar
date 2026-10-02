@@ -36,6 +36,9 @@ CI runs the lint and the build on every PR.
 ## Pull requests
 
 - One change per PR. Small PRs get reviewed faster.
+- Title PRs with a [Conventional Commits](https://www.conventionalcommits.org/) type: `feat:`, `fix:`, `perf:`,
+  `refactor:`, `docs:`, `ci:`, `chore:` or `test:`, then a short description, e.g. `fix: chart labels cut off at
+  the right edge`. Add the version for release PRs: `feat: processes page (1.4.0)`.
 - Describe what changed and why, and attach a screenshot for anything visible.
 - If it's user-facing, add a line under `## [Unreleased]` in [`CHANGELOG.md`](CHANGELOG.md). CI fails a PR that
   changes `Sources/` without touching the changelog; add the `skip-changelog` label for changes users won't notice.
