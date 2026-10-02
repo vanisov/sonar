@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Battery health and charge from the SMC's battery service; nil on desktops.
+/// Battery health and charge from the AppleSmartBattery registry entry; nil on desktops.
 struct BatteryInfo {
     let charge: Int
     let maxCapacity: Int?
@@ -23,7 +23,7 @@ struct BatteryInfo {
         let nominal = data?["NominalChargeCapacity"] as? Int
         return BatteryInfo(
             charge: dict["CurrentCapacity"] as? Int ?? 0,
-            maxCapacity: design.flatMap { d in nominal.map { Int((Double($0) / Double(d) * 100).rounded()) } },
+            maxCapacity: design.flatMap { d in d > 0 ? nominal.map { Int((Double($0) / Double(d) * 100).rounded()) } : nil },
             cycles: dict["CycleCount"] as? Int,
             charging: dict["IsCharging"] as? Bool ?? false,
             onPower: dict["ExternalConnected"] as? Bool ?? false,

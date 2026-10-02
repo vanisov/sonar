@@ -56,15 +56,16 @@ final class Monitor {
     /// Open views (popover, dashboard). Nobody looking = skip the expensive readings.
     @ObservationIgnored private var viewers = 0
     @ObservationIgnored fileprivate var processWatchers = 0
-    @ObservationIgnored var lastRowCPU: [pid_t: UInt64] = [:]
+    // Keyed by PID but tagged with the start time, so a reused PID isn't mistaken for the old process.
+    @ObservationIgnored var lastRowCPU: [pid_t: (started: UInt64, cpu: UInt64)] = [:]
     @ObservationIgnored var lastRowsSample = Date()
-    @ObservationIgnored var processNames: [pid_t: String] = [:]
+    @ObservationIgnored var processNames: [pid_t: (started: UInt64, name: String)] = [:]
     @ObservationIgnored var userNames: [uid_t: String] = [:]
     @ObservationIgnored private var tick = 0
     @ObservationIgnored private let smc: SMC?
     @ObservationIgnored private let fanKeys: [(actual: UInt32, mode: UInt32)]
     @ObservationIgnored private var lastCoreTicks: [(busy: UInt64, total: UInt64)] = []
-    @ObservationIgnored private var lastDisk: (read: UInt64, write: UInt64)?
+    @ObservationIgnored private var lastDisk: (read: UInt64, write: UInt64, at: Date)?
     @ObservationIgnored private let gpuEntries: [io_registry_entry_t]
     @ObservationIgnored private var lastTicks: (busy: UInt64, total: UInt64)?
     @ObservationIgnored private var lastNet: (down: UInt64, up: UInt64)?
@@ -158,13 +159,15 @@ final class Monitor {
             default: "Normal"
             }
 
-        let net = networkBytes()
-        if let last = lastNet {
-            down = Double(net.down &- last.down) / elapsed
-            up = Double(net.up &- last.up) / elapsed
+        // A failed read skips the tick: treating it as 0 would make the next tick report everything since boot.
+        if let net = networkBytes() {
+            if let last = lastNet {
+                down = Self.rate(net.down, last.down, over: elapsed)
+                up = Self.rate(net.up, last.up, over: elapsed)
+            }
+            lastNet = net
+            networkTotal = net
         }
-        lastNet = net
-        networkTotal = net
         downHistory.append(Float(down))
         upHistory.append(Float(up))
 
@@ -187,14 +190,14 @@ final class Monitor {
             diskFree = v.volumeAvailableCapacityForImportantUsage ?? 0
         }
 
-        if watched || slowTick {
-            let disk = diskBytes()
+        if watched || slowTick, let disk = diskBytes() {
             if let last = lastDisk {
-                let span = watched ? elapsed : max(elapsed, 2) * (slowTick ? 1 : 5)
-                diskRead = Double(disk.read &- last.read) / span
-                diskWrite = Double(disk.write &- last.write) / span
+                // Measured since the last read, which is 10 s ago when nothing is open.
+                let span = now.timeIntervalSince(last.at)
+                diskRead = Self.rate(disk.read, last.read, over: span)
+                diskWrite = Self.rate(disk.write, last.write, over: span)
             }
-            lastDisk = disk
+            lastDisk = (disk.read, disk.write, now)
         }
         diskReadHistory.append(Float(diskRead))
         diskWriteHistory.append(Float(diskWrite))
@@ -226,7 +229,7 @@ final class Monitor {
         gpuTempHistory.append(Float(gpuTemp ?? 0))
 
         if watched || slowTick || menuBar.contains("fan") {
-            fanRPMs = fanKeys.compactMap { smc?.read($0.actual) }
+            fanRPMs = fanKeys.map { smc?.read($0.actual) ?? 0 }  // keep positions: fanRPMs[i] is fan i
             fansAuto = fanKeys.allSatisfy { smc?.read($0.mode) != 1 }  // 0 = auto, 3 = stopped by macOS at idle, 1 = forced
         }
         for i in fanHistories.indices { fanHistories[i].append(Float(i < fanRPMs.count ? fanRPMs[i] : 0)) }
@@ -235,6 +238,14 @@ final class Monitor {
         if watched || tick == 1 { sampleApps() }
         if processWatchers > 0 { sampleProcesses() }
         uptime = now.timeIntervalSince1970 - Double(sysctlValue("kern.boottime", timeval()).tv_sec)
+    }
+
+    /// How much a cumulative counter grew. Sums over devices or processes can shrink (a drive is ejected, a dock is
+    /// unplugged, a PID is reused), so a drop counts as no growth instead of wrapping to ~1.8e19.
+    nonisolated static func delta(_ new: UInt64, _ old: UInt64) -> UInt64 { new >= old ? new - old : 0 }
+
+    nonisolated static func rate(_ new: UInt64, _ old: UInt64, over seconds: Double) -> Double {
+        seconds > 0 ? Double(delta(new, old)) / seconds : 0
     }
 
     private func hottest(of group: String) -> Double? {
@@ -285,10 +296,10 @@ final class Monitor {
     }
 
     /// Total bytes read and written by every block storage driver since boot.
-    private func diskBytes() -> (read: UInt64, write: UInt64) {
+    private func diskBytes() -> (read: UInt64, write: UInt64)? {
         var iter: io_iterator_t = 0
         guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOBlockStorageDriver"), &iter) == KERN_SUCCESS
-        else { return (0, 0) }
+        else { return nil }
         defer { IOObjectRelease(iter) }
         var read: UInt64 = 0, write: UInt64 = 0
         while case let entry = IOIteratorNext(iter), entry != 0 {
@@ -323,12 +334,12 @@ final class Monitor {
     }
 
     /// 64-bit byte counters for physical interfaces (en*), so VPN tunnels aren't double-counted.
-    private func networkBytes() -> (down: UInt64, up: UInt64) {
+    private func networkBytes() -> (down: UInt64, up: UInt64)? {
         var mib: [Int32] = [CTL_NET, PF_ROUTE, 0, 0, NET_RT_IFLIST2, 0]
         var len = 0
-        guard sysctl(&mib, 6, nil, &len, nil, 0) == 0 else { return (0, 0) }
+        guard sysctl(&mib, 6, nil, &len, nil, 0) == 0 else { return nil }
         var buf = [UInt8](repeating: 0, count: len)
-        guard sysctl(&mib, 6, &buf, &len, nil, 0) == 0 else { return (0, 0) }
+        guard sysctl(&mib, 6, &buf, &len, nil, 0) == 0 else { return nil }  // e.g. an interface appeared in between
         var down: UInt64 = 0, up: UInt64 = 0, offset = 0
         var name = [CChar](repeating: 0, count: Int(IF_NAMESIZE))
         buf.withUnsafeBytes { raw in
@@ -387,7 +398,7 @@ final class Monitor {
                 }()
             guard running[owner] != nil else { continue }
             totals[owner, default: (0, 0)].memory += info.ri_phys_footprint
-            totals[owner, default: (0, 0)].cpu += cpuTime &- (lastProcCPU[pid] ?? cpuTime)
+            totals[owner, default: (0, 0)].cpu += Self.delta(cpuTime, lastProcCPU[pid] ?? cpuTime)
         }
         lastProcCPU = nextCPU
         owners = owners.filter { nextCPU[$0.key] != nil }
