@@ -19,17 +19,18 @@ extension Monitor {
         }
         var appTotals: [pid_t: Totals] = [:]
         var rows: [ProcessRow] = []
-        var nextCPU: [pid_t: UInt64] = [:]
+        var nextCPU: [pid_t: (started: UInt64, cpu: UInt64)] = [:]
         var seen = Set<pid_t>()
 
-        for (pid, uid, comm) in Self.allProcesses() where pid > 0 {
+        for (pid, uid, comm, started) in Self.allProcesses() where pid > 0 {
             seen.insert(pid)
-            let name = processNames[pid] ?? Self.processName(pid, fallback: comm)
-            processNames[pid] = name
+            let cached = processNames[pid]
+            let name = cached?.started == started ? cached!.name : Self.processName(pid, fallback: comm)
+            processNames[pid] = (started, name)
             let user = userNames[uid] ?? (getpwuid(uid).map { String(cString: $0.pointee.pw_name) } ?? "\(uid)")
             userNames[uid] = user
             guard uid == me else {
-                rows.append(ProcessRow(id: pid, name: name, user: user, locked: .otherUser))
+                rows.append(ProcessRow(id: pid, started: started, name: name, user: user, locked: .otherUser))
                 continue
             }
             var usage = rusage_info_v2()
@@ -41,8 +42,9 @@ extension Monitor {
             let threads =
                 proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &task, Int32(MemoryLayout<proc_taskinfo>.size)) > 0 ? Int(task.pti_threadnum) : nil
             let cpuTime = readable ? usage.ri_user_time + usage.ri_system_time : 0
-            nextCPU[pid] = cpuTime
-            let delta = cpuTime &- (lastRowCPU[pid] ?? cpuTime)
+            nextCPU[pid] = (started, cpuTime)
+            let last = lastRowCPU[pid].flatMap { $0.started == started ? $0.cpu : nil }
+            let delta = Monitor.delta(cpuTime, last ?? cpuTime)
             let owner = responsiblePID?(pid) ?? pid
             if running[owner] != nil {
                 appTotals[owner, default: Totals()].cpu += delta
@@ -53,7 +55,7 @@ extension Monitor {
             if running[pid] != nil { continue }  // the app itself is its own row below
             rows.append(
                 ProcessRow(
-                    id: pid, name: name, user: user, cpu: readable ? percent(delta, elapsed) : nil,
+                    id: pid, started: started, name: name, user: user, cpu: readable ? percent(delta, elapsed) : nil,
                     memory: readable ? usage.ri_phys_footprint : nil, threads: threads,
                     locked: ProcessRow.protectedNames.contains(name) ? .protected : nil))
         }
@@ -62,10 +64,11 @@ extension Monitor {
             guard let app = running[pid] else { continue }
             rows.append(
                 ProcessRow(
-                    id: pid, name: app.localizedName ?? processNames[pid] ?? "App", user: userNames[me] ?? "",
+                    id: pid, started: processNames[pid]?.started ?? 0, name: app.localizedName ?? processNames[pid]?.name ?? "App",
+                    user: userNames[me] ?? "",
                     cpu: percent(total.cpu, elapsed),
                     memory: total.memory, threads: total.threads,
-                    locked: ProcessRow.protectedNames.contains(processNames[pid] ?? "") ? .protected : nil,
+                    locked: ProcessRow.protectedNames.contains(processNames[pid]?.name ?? "") ? .protected : nil,
                     app: app, processCount: total.processes))
         }
         processNames = processNames.filter { seen.contains($0.key) }
@@ -77,7 +80,8 @@ extension Monitor {
     }
 
     /// pid, owner and short name of every process, including other users' (sysctl works without privileges).
-    private static func allProcesses() -> [(pid_t, uid_t, String)] {
+    /// PID, owner, short name and start time (µs since 1970) of every process.
+    private static func allProcesses() -> [(pid_t, uid_t, String, UInt64)] {
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0]
         var size = 0
         guard sysctl(&mib, 4, nil, &size, nil, 0) == 0 else { return [] }
@@ -88,8 +92,16 @@ extension Monitor {
         return procs.prefix(size / stride).map { kp in
             var comm = kp.kp_proc.p_comm
             let name = withUnsafeBytes(of: &comm) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
-            return (kp.kp_proc.p_pid, kp.kp_eproc.e_ucred.cr_uid, name)
+            let start = kp.kp_proc.p_starttime
+            return (kp.kp_proc.p_pid, kp.kp_eproc.e_ucred.cr_uid, name, UInt64(start.tv_sec) * 1_000_000 + UInt64(start.tv_usec))
         }
+    }
+
+    /// When `pid` started (µs since 1970), or nil if it's gone. Same clock as `allProcesses`.
+    nonisolated static func startTime(of pid: pid_t) -> UInt64? {
+        var info = proc_bsdinfo()
+        guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, Int32(MemoryLayout<proc_bsdinfo>.size)) > 0 else { return nil }
+        return info.pbi_start_tvsec * 1_000_000 + info.pbi_start_tvusec
     }
 
     /// Full executable name (the short sysctl name is cut at 16 characters).

@@ -8,6 +8,8 @@ struct ProcessRow: Identifiable {
     }
 
     let id: pid_t
+    /// Start time (µs since 1970). PIDs get reused, so (id, started) is what identifies this process.
+    let started: UInt64
     let name: String
     let user: String
     var cpu: Double?
@@ -22,16 +24,16 @@ struct ProcessRow: Identifiable {
     /// Ending these logs you out or takes the session down, even though they run as you.
     static let protectedNames: Set<String> = ["loginwindow", "launchd", "WindowServer", "kernel_task"]
 
-    @MainActor private static var iconCache: [pid_t: NSImage] = [:]
+    @MainActor private static var iconCache: [pid_t: (started: UInt64, icon: NSImage?)] = [:]
 
     @MainActor static func clearIconCache() { iconCache = [:] }
 
     /// App icons come from disk, so cache them for the life of the process.
     @MainActor var icon: NSImage? {
         guard let app else { return nil }
-        if let cached = Self.iconCache[id] { return cached }
+        if let cached = Self.iconCache[id], cached.started == started { return cached.icon }
         let icon = app.icon
-        Self.iconCache[id] = icon
+        Self.iconCache[id] = (started, icon)
         return icon
     }
 
