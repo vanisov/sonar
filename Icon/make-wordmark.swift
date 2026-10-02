@@ -1,6 +1,6 @@
 #!/usr/bin/env swift
 
-// Traces "sonar" in Unbounded Bold into Sources/Sonar/Wordmark.swift, so the app ships a ~2 KB shape
+// Traces "sonar" in Unbounded Bold into Sources/Sonar/Shared/Brand/Wordmark.swift, so the app ships a ~2 KB shape
 // instead of a 778 KB font. Unbounded is © The Unbounded Project Authors, SIL Open Font License 1.1.
 // Run: ./Icon/make-wordmark.swift path/to/Unbounded[wght].ttf
 //   (font: https://github.com/google/fonts/tree/main/ofl/unbounded)
@@ -69,6 +69,6 @@ let swift = """
 
     """
 let out = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-    .appendingPathComponent("Sources/Sonar/Wordmark.swift")
+    .appendingPathComponent("Sources/Sonar/Shared/Brand/Wordmark.swift")
 try! swift.write(to: out, atomically: true, encoding: .utf8)
 print("Wrote \(out.path) (\(lines.count) path elements)")
