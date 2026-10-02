@@ -8,7 +8,7 @@
 
 ## Checklist
 
-- [ ] `xcrun swift-format lint --strict --recursive Sources` passes
+- [ ] `xcrun swift-format lint --strict --recursive Sources Tests` and `swift test` pass
 - [ ] Ran the app and checked the change by hand
 - [ ] `./perf.sh` is within budget (for sampling or view changes)
 - [ ] Added a line under `## [Unreleased]` in `CHANGELOG.md` (for user-facing changes)

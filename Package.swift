@@ -4,5 +4,8 @@ import PackageDescription
 let package = Package(
     name: "Sonar",
     platforms: [.macOS(.v14)],
-    targets: [.executableTarget(name: "Sonar")]
+    targets: [
+        .executableTarget(name: "Sonar"),
+        .testTarget(name: "SonarTests", dependencies: ["Sonar"]),
+    ]
 )

@@ -11,6 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Lint
-        run: xcrun swift-format lint --strict --recursive Sources
+        run: xcrun swift-format lint --strict --recursive Sources Tests
+      - name: Test
+        run: swift test
       - name: Build
         run: DEVELOPER_DIR="$(xcode-select -p)" ./bundle.sh
