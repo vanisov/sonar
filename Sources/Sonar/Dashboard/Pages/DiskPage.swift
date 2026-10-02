@@ -51,7 +51,7 @@ struct DiskPage: View {
                 GeometryReader { g in
                     HStack(spacing: 2) {
                         ForEach(segments, id: \.0) { c, size in
-                            Rectangle().fill(c.color).frame(width: max(0, g.size.width * Double(size) / Double(m.diskTotal) - 2))
+                            Rectangle().fill(c.color).frame(width: max(0, g.size.width * Double(size) / Double(max(m.diskTotal, 1)) - 2))
                                 .help("\(c.title): \(Fmt.storage(size))")
                         }
                         Spacer(minLength: 0)

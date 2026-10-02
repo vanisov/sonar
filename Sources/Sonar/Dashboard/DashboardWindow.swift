@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor enum DashboardWindow {
     static var monitor: Monitor?
     private static var window: NSWindow?
+    private static var closeObserver: NSObjectProtocol?
 
     static func show(_ section: DashboardSection?, activate: Bool = true) {
         guard let monitor else { return }
@@ -29,8 +30,11 @@ import SwiftUI
             w.isReleasedWhenClosed = false
             w.setFrameAutosaveName("SonarDashboard")
             if !w.setFrameUsingName("SonarDashboard") { w.center() }
-            NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { note in
+            closeObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.willCloseNotification, object: w, queue: .main
+            ) { note in
                 MainActor.assumeIsolated {
+                    if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
                     // AppKit can keep a closed window around; detach the SwiftUI tree so it stops updating.
                     (note.object as? NSWindow)?.contentViewController = nil
                     window = nil

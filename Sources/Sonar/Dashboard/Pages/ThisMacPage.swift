@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ThisMacPage: View {
     let monitor: Monitor
-    @State private var battery = BatteryInfo.read()
+    @State private var battery: BatteryInfo?  // read in onAppear, not on every redraw
     @State private var copied = false
     private let info = MacInfo.shared
 
@@ -24,7 +24,10 @@ struct ThisMacPage: View {
             }
             .padding(20)
         }
-        .onAppear { battery = BatteryInfo.read() }
+        .onAppear {
+            battery = BatteryInfo.read()
+            copied = false
+        }
     }
 
     private var header: some View {

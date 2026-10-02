@@ -4,6 +4,7 @@ import SwiftUI
 /// (SwiftUI's Settings scene keeps its window, and everything in it, alive after closing.)
 @MainActor enum SettingsWindow {
     private static var window: NSWindow?
+    private static var closeObserver: NSObjectProtocol?
 
     static func open() {
         if window == nil {
@@ -28,8 +29,11 @@ import SwiftUI
             w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false
             w.center()
-            NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { note in
+            closeObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.willCloseNotification, object: w, queue: .main
+            ) { note in
                 MainActor.assumeIsolated {
+                    if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
                     (note.object as? NSWindow)?.contentViewController = nil
                     window = nil
                     resignActiveIfNoWindows(closing: note.object as? NSWindow)
