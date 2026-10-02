@@ -36,10 +36,32 @@ CI runs the lint and the build on every PR.
 ## Pull requests
 
 - One change per PR. Small PRs get reviewed faster.
+- Title the PR like a commit message (see below). Add the version for release PRs: `feat: processes page (1.4.0)`.
 - Describe what changed and why, and attach a screenshot for anything visible.
 - If it's user-facing, add a line under `## [Unreleased]` in [`CHANGELOG.md`](CHANGELOG.md). CI fails a PR that
   changes `Sources/` without touching the changelog; add the `skip-changelog` label for changes users won't notice.
 - Performance changes: include `./perf.sh` output from before and after.
+
+## Commit messages and PR titles
+
+Commits and PR titles follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/). PRs are
+merged with merge commits, so every commit on your branch ends up on `main`.
+
+```
+<type>[optional scope][!]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+- **Types:** `feat` (a new feature) and `fix` (a bug fix) come from the spec. We also use `perf`, `refactor`,
+  `docs`, `test`, `ci`, `build` and `chore`, which the spec allows.
+- **Scope** is optional and names the area in parentheses: `feat(disk): show what's using storage`.
+- **Description:** lowercase, imperative, no trailing period: `fix: keep chart labels inside the card`.
+- **Breaking changes** add `!` after the type or scope (`feat!: require macOS 15`), or a `BREAKING CHANGE:` footer.
+- **Versions:** as in the spec, `fix` means a PATCH release, `feat` a MINOR one, and a breaking change a MAJOR one.
+  See [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Code style
 

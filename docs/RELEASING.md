@@ -10,7 +10,9 @@ Sonar follows [Semantic Versioning](https://semver.org): `MAJOR.MINOR.PATCH`.
 | **MINOR** | New features or visible behavior changes that keep everything working | 1.1.0 → 1.2.0 |
 | **PATCH** | Bug fixes and performance work with no new features | 1.2.0 → 1.2.1 |
 
-Changes that don't touch the app (docs, CI, repo config) don't get a release.
+Commit types ([Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)) map onto this: a breaking
+change (`!` or `BREAKING CHANGE:`) means MAJOR, `feat` means MINOR, `fix` and `perf` mean PATCH. Changes that don't
+touch the app (`docs`, `ci`, `chore`, repo config) don't get a release.
 
 The **git tag is the single source of truth** for the version. `bundle.sh` reads the latest `vX.Y.Z` tag
 and writes it into the app's `Info.plist`, so there's no version number to edit by hand.
@@ -26,7 +28,7 @@ Releases happen by merging. No one tags by hand.
 
 1. In the PR that should ship (or a separate one), rename `## [Unreleased]` in `CHANGELOG.md` to
    `## [X.Y.Z] - YYYY-MM-DD`, add a fresh empty `## [Unreleased]` above it, update the compare links at the
-   bottom, and commit it as `Release X.Y.Z`.
+   bottom, and commit it as `chore: release X.Y.Z`.
 2. Merge the PR once CI is green.
 3. The [release workflow](../.github/workflows/release.yml) sees a changelog version that isn't tagged yet,
    builds `Sonar.zip` on a clean macOS runner, creates the `vX.Y.Z` tag on the merge commit, and publishes the
