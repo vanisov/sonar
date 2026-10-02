@@ -444,11 +444,23 @@ struct DiskPage: View {
         }
     }
 
+    private func diskStat(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            Text(value).font(.system(size: 17, weight: .semibold, design: .rounded)).monospacedDigit()
+            Text(label).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
     @ViewBuilder private func usage(_ m: Monitor, used: Int64) -> some View {
         let storage = StorageBreakdown.shared
         let segments = storage.segments(used: used)
         DashCard(title: "Macintosh HD", symbol: "internaldrive", tint: .orange, trailing: "startup disk") {
-            BigValue(value: Fmt.storage(m.diskFree), caption: "available")
+            HStack(alignment: .top, spacing: 28) {
+                BigValue(value: Fmt.storage(m.diskFree), caption: "available")
+                Spacer()
+                diskStat("Used", Fmt.storage(used))
+                diskStat("Capacity", Fmt.storage(m.diskTotal))
+            }
             if segments.isEmpty {
                 UsageBar(fraction: m.diskTotal > 0 ? Double(used) / Double(m.diskTotal) : 0, color: .orange)
             } else {
@@ -469,8 +481,6 @@ struct DiskPage: View {
             }
             LazyVGrid(columns: two, spacing: 0) {
                 ForEach(segments, id: \.0) { c, size in keyValue(c.title, Fmt.storage(size), dot: c.color) }
-                keyValue("Used", Fmt.storage(used))
-                keyValue("Capacity", Fmt.storage(m.diskTotal))
             }
             HStack(spacing: 6) {
                 if storage.calculating {
@@ -484,6 +494,34 @@ struct DiskPage: View {
             .font(.caption).foregroundStyle(.secondary)
         }
         .onAppear { storage.refreshIfStale() }
+        let system = storage.systemBreakdown(used: used)
+        if !segments.isEmpty, !system.isEmpty {
+            let total = Double(max(storage.systemDataSize(used: used), 1))
+            DashCard(
+                title: "System Data", symbol: "gearshape.2", tint: .secondary,
+                trailing: Fmt.storage(storage.systemDataSize(used: used))
+            ) {
+                VStack(spacing: 0) {
+                    ForEach(system, id: \.0) { part, size in
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(part?.title ?? "Snapshots and other")
+                                Spacer()
+                                Text(Fmt.storage(size)).monospacedDigit()
+                            }
+                            Text(
+                                part?.detail
+                                    ?? "Local snapshots (including staged macOS updates), Recovery, and folders Sonar can't read"
+                            )
+                            .font(.caption).foregroundStyle(.secondary)
+                            UsageBar(fraction: Double(size) / total, color: StorageCategory.systemData.color)
+                        }
+                        .padding(.vertical, 8)
+                        if part != system.last?.0 { Divider() }
+                    }
+                }
+            }
+        }
         DashCard(title: "Activity", symbol: "arrow.up.arrow.down", tint: .orange, trailing: "all disks") {
             HStack(spacing: 24) {
                 BigValue(value: Fmt.rate(m.diskRead), caption: "Read", dot: .orange)

@@ -16,6 +16,9 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
   calculation asks for access to Desktop, Documents and Downloads. A full pass reads every file in your home folder,
   so it runs in the background at low priority, is kept across launches, and is redone at most once a day, or when
   you click Recalculate.
+- System Data is broken down too: app data, caches, hidden folders in your home, apps and tools for all users,
+  downloaded system assets, system files, macOS support volumes, and snapshots and other space Sonar can't
+  attribute. Used and Capacity moved up next to the available space.
 
 ## [1.5.0] - 2026-10-01
 
