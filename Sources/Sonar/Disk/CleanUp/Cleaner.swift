@@ -17,30 +17,30 @@ import SwiftUI
     var phase = Phase.idle
     var categories: [CleanCategory] = []
     var selection: Set<URL> = []
+    /// Bumped by every scan and reset, so an older scan still running in the background can't add its results.
+    private var generation = 0
 
     var selectedSize: Int64 {
         categories.flatMap(\.items).filter { selection.contains($0.url) }.reduce(0) { $0 + $1.size }
     }
 
     func scan() {
+        generation += 1
+        let scan = generation
         phase = .scanning("")
         categories = []
         selection = []
         let running = NSWorkspace.shared.runningApplications.map { (id: $0.bundleIdentifier, name: $0.localizedName) }
         Task.detached(priority: .utility) {
             for (title, find) in CleanScanner.categories(running: running) {
-                // Stop if the dashboard closed (reset) mid-scan.
-                guard await MainActor.run(body: { self.isScanning }) else { return }
+                // Stop if the dashboard closed (reset) or a newer scan started.
+                guard await MainActor.run(body: { self.generation == scan }) else { return }
                 await MainActor.run { self.phase = .scanning(title) }
                 let category = find()
-                await MainActor.run { if self.isScanning { self.add(category) } }
+                await MainActor.run { if self.generation == scan { self.add(category) } }
             }
-            await MainActor.run { if self.isScanning { self.phase = .ready } }
+            await MainActor.run { if self.generation == scan { self.phase = .ready } }
         }
-    }
-
-    private var isScanning: Bool {
-        if case .scanning = phase { true } else { false }
     }
 
     private func add(_ category: CleanCategory) {
@@ -51,6 +51,7 @@ import SwiftUI
 
     func reset() {
         guard phase != .cleaning else { return }
+        generation += 1
         phase = .idle
         categories = []
         selection = []
@@ -62,7 +63,10 @@ import SwiftUI
         Task.detached(priority: .userInitiated) {
             var moved: Int64 = 0
             var trashed: Set<URL> = []
+            let inUse = Date.now.addingTimeInterval(-3600)
             for item in picked {
+                // The scan may be hours old: skip anything an app has written to since, like the scan does.
+                guard CleanScanner.scan(item.url).lastWrite < inUse else { continue }
                 do {
                     try FileManager.default.trashItem(at: item.url, resultingItemURL: nil)
                     moved += item.size

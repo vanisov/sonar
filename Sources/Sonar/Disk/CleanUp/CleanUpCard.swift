@@ -118,7 +118,7 @@ struct CleanUpCard: View {
                 Text("Moved \(Fmt.storage(moved)) to the Trash.")
                 Text(
                     failed > 0
-                        ? "\(failed) item\(failed == 1 ? "" : "s") couldn't be moved. Empty the Trash to free the space."
+                        ? "\(failed) item\(failed == 1 ? "" : "s") were in use or couldn't be moved. Empty the Trash to free the space."
                         : "Empty the Trash to free the space. Until then, you can put anything back."
                 )
                 .font(.caption).foregroundStyle(.secondary)

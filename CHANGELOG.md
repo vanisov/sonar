@@ -8,6 +8,21 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-10-02
+
+### Fixed
+- Network and disk charts no longer spike to absurd values when a drive is ejected, a dock or adapter is
+  unplugged, or a reading fails.
+- Disk read and write rates were up to 5× too high while the panel and dashboard were closed.
+- Fan speeds no longer shift to the wrong fan when one reading fails.
+- End and Force End can't hit a different process that reused the PID while a confirmation was open, and a new
+  process no longer shows the previous one's name or CPU.
+- Clean Up checks again, at the moment you click Move to Trash, that nothing was written in the last hour.
+- Updates: a beta can no longer replace the release it precedes, the download must be exactly the advertised
+  version of Sonar from GitHub, GitHub rate limits get a clear message, and the app relaunches reliably.
+- The Network and This Mac pages no longer re-read interfaces and battery info on every update.
+- VoiceOver reads the panel's Settings and Quit buttons by name.
+
 ## [1.6.0] - 2026-10-01
 
 ### Added
@@ -127,7 +142,8 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 - Choice of stats in the menu bar, and launch at login.
 - Dashboard with an hour of history, every temperature sensor, and all running apps.
 
-[Unreleased]: https://github.com/vanisov/sonar/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/vanisov/sonar/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/vanisov/sonar/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/vanisov/sonar/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/vanisov/sonar/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/vanisov/sonar/compare/v1.4.0...v1.4.1

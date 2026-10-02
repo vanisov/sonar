@@ -164,12 +164,12 @@ struct PanelContent: View {
                 Label("Open dashboard", systemImage: "square.grid.2x2")
             }
             Spacer()
-            Button(action: openSettings) { Image(systemName: "slider.horizontal.3") }
+            Button(action: openSettings) { Label("Settings", systemImage: "slider.horizontal.3").labelStyle(.iconOnly) }
                 .help("Settings (⌘,)")
             Button {
                 NSApp.terminate(nil)
             } label: {
-                Image(systemName: "power")
+                Label("Quit Sonar", systemImage: "power").labelStyle(.iconOnly)
             }
             .help("Quit Sonar")
         }

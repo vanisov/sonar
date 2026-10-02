@@ -56,7 +56,15 @@ import AppKit
         do {
             var request = URLRequest(url: URL(string: "https://api.github.com/repos/\(Self.repo)/releases?per_page=10")!)
             request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-            let (data, _) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard code == 200 else {
+                status = .failed(
+                    code == 403 || code == 429
+                        ? "GitHub is limiting requests right now. Sonar will try again later."
+                        : "GitHub returned an error (\(code)). Try again later.")
+                return
+            }
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             let releases = try decoder.decode([GitHubRelease].self, from: data)
@@ -78,7 +86,11 @@ import AppKit
 
     /// Downloads the release zip, swaps it in for the running app, and relaunches.
     func install() async {
-        guard let zip = latest?.zip else { return }
+        guard status != .installing, let latest, let zip = latest.zip else { return }
+        guard zip.scheme == "https", zip.host == "github.com" else {
+            status = .failed("The download link didn't point to GitHub.")
+            return
+        }
         let appURL = Bundle.main.bundleURL
         guard appURL.pathExtension == "app" else {
             status = .failed("Updates install into Sonar.app. You're running from source.")
@@ -88,6 +100,10 @@ import AppKit
         do {
             let (download, _) = try await URLSession.shared.download(from: zip)
             let work = FileManager.default.temporaryDirectory.appendingPathComponent("SonarUpdate-\(UUID().uuidString)")
+            defer {
+                try? FileManager.default.removeItem(at: download)
+                try? FileManager.default.removeItem(at: work)
+            }
             try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
             let unzip = Process()
             unzip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
@@ -95,8 +111,13 @@ import AppKit
             try unzip.run()
             unzip.waitUntilExit()
             let newApp = work.appendingPathComponent("Sonar.app")
+            // Only Sonar itself, the version the release says, and never a downgrade or a link to another app.
+            let bundle = Bundle(url: newApp)
+            let version = bundle?.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
             guard unzip.terminationStatus == 0,
-                Bundle(url: newApp)?.bundleIdentifier == Bundle.main.bundleIdentifier
+                (try? newApp.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == false,
+                bundle?.bundleIdentifier == Bundle.main.bundleIdentifier,
+                version == latest.version, Self.isNewer(version, than: Self.currentVersion)
             else {
                 status = .failed("The download wasn't a valid Sonar.app.")
                 return
@@ -104,7 +125,10 @@ import AppKit
             _ = try FileManager.default.replaceItemAt(appURL, withItemAt: newApp)
             let relaunch = Process()
             relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
-            relaunch.arguments = ["-c", "sleep 1; /usr/bin/open \"$0\"", appURL.path]
+            // Wait for this process to exit, or `open` may just bring the old instance forward.
+            relaunch.arguments = [
+                "-c", "while kill -0 \"$1\" 2>/dev/null; do sleep 0.2; done; /usr/bin/open \"$0\"", appURL.path, "\(getpid())",
+            ]
             try relaunch.run()
             NSApp.terminate(nil)
         } catch {
@@ -112,14 +136,27 @@ import AppKit
         }
     }
 
-    /// "1.10.0" > "1.9.2"
+    /// Semantic versions: "1.10.0" > "1.9.2", and a prerelease is older than its release: "1.5.0-beta.1" < "1.5.0".
     nonisolated static func isNewer(_ a: String, than b: String) -> Bool {
-        let x = a.split(separator: ".").map { Int($0) ?? 0 }, y = b.split(separator: ".").map { Int($0) ?? 0 }
-        for i in 0..<max(x.count, y.count) {
-            let l = i < x.count ? x[i] : 0, r = i < y.count ? y[i] : 0
+        func parts(_ v: String) -> (core: [Int], pre: [Substring]?) {
+            let split = v.split(separator: "-", maxSplits: 1)
+            return (
+                split.first.map { $0.split(separator: ".").map { Int($0) ?? 0 } } ?? [],
+                split.count > 1 ? split[1].split(separator: ".") : nil
+            )
+        }
+        let (x, y) = (parts(a), parts(b))
+        for i in 0..<max(x.core.count, y.core.count) {
+            let l = i < x.core.count ? x.core[i] : 0, r = i < y.core.count ? y.core[i] : 0
             if l != r { return l > r }
         }
-        return false
+        guard let l = x.pre else { return y.pre != nil }  // same core: a release beats a prerelease
+        guard let r = y.pre else { return false }
+        for (p, q) in zip(l, r) where p != q {
+            if let p = Int(p), let q = Int(q) { return p > q }  // beta.10 > beta.9
+            return p > q  // rc > beta
+        }
+        return l.count > r.count
     }
 
     private struct GitHubRelease: Decodable {

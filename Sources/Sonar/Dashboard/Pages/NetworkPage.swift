@@ -2,7 +2,7 @@ import SwiftUI
 
 struct NetworkPage: View {
     let monitor: Monitor
-    @State private var interfaces = NetworkInterface.all()
+    @State private var interfaces: [NetworkInterface] = []  // read in onAppear, not on every redraw
 
     var body: some View {
         let m = monitor
