@@ -42,7 +42,7 @@ import SwiftUI
                 self.calculating = false
                 self.updated = .now
                 let saved = final.map { ($0.rawValue, $1) } + finalParts.map { ($0.rawValue, $1) }
-                UserDefaults.standard.set(Dictionary(uniqueKeysWithValues: saved), forKey: Prefs.storageBreakdown)
+                UserDefaults.standard.set(Dictionary(saved, uniquingKeysWith: { a, _ in a }), forKey: Prefs.storageBreakdown)
                 UserDefaults.standard.set(Date.now, forKey: Prefs.storageBreakdownDate)
             }
         }
