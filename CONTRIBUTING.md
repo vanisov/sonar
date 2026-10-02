@@ -13,12 +13,22 @@ Thanks for helping. Sonar is small on purpose, so a few rules keep it that way.
 
 ## Setup
 
-You need Xcode 26 or later (SwiftUI's macros ship with Xcode, not the Command Line Tools) and an Apple silicon Mac.
+You need Xcode 26 or later and an Apple silicon Mac. SwiftUI's macros ship with Xcode, not the Command Line Tools,
+so make sure Xcode is the selected toolchain:
+
+```bash
+xcode-select -p        # should print /Applications/Xcode.app/Contents/Developer
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer   # if it prints CommandLineTools
+```
+
+If you'd rather not switch, prefix commands with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
+Otherwise `swift build` fails with "plugin for module 'SwiftUIMacros' not found". `bundle.sh` handles this itself.
 
 ```bash
 git clone https://github.com/vanisov/sonar
 cd sonar
-swift run              # run from source
+swift run              # run from source (or open Package.swift in Xcode)
+swift test             # unit tests
 ./bundle.sh install    # build Sonar.app and install it to /Applications
 ```
 
