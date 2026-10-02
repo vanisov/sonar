@@ -58,6 +58,7 @@ enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
         didSet { if let section { UserDefaults.standard.set(section.rawValue, forKey: Prefs.dashboardLastSection) } }
     }
     var query = ""
+    var diskCleanUp = false  // the Disk page's Clean Up tab
 }
 
 /// Created on demand and torn down on close. A SwiftUI `Window` scene stays alive offscreen
@@ -66,7 +67,7 @@ enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
     static var monitor: Monitor?
     private static var window: NSWindow?
 
-    static func show(_ section: DashboardSection?) {
+    static func show(_ section: DashboardSection?, activate: Bool = true) {
         guard let monitor else { return }
         let nav = DashboardNavigation.shared
         if let section {
@@ -77,7 +78,7 @@ enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
             nav.section = DashboardSection(rawValue: key) ?? .overview
         }
         if window == nil {
-            if Prefs.bool(Prefs.showInDock, default: true) { NSApp.setActivationPolicy(.regular) }
+            if activate, Prefs.bool(Prefs.showInDock, default: true) { NSApp.setActivationPolicy(.regular) }
             let host = NSHostingController(rootView: DashboardView(monitor: monitor))
             host.sceneBridgingOptions = .all  // lets SwiftUI install the toolbar, title and search field
             let w = NSWindow(contentViewController: host)
@@ -95,15 +96,23 @@ enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
                     (note.object as? NSWindow)?.contentViewController = nil
                     window = nil
                     DashboardNavigation.shared.query = ""
+                    DashboardNavigation.shared.diskCleanUp = false
+                    Cleaner.shared.reset()
                     NSApp.setActivationPolicy(.accessory)
                     resignActiveIfNoWindows(closing: note.object as? NSWindow)
                 }
             }
             window = w
         }
+        guard activate else {
+            window?.orderBack(nil)  // screenshots: on screen but behind everything, without taking focus
+            return
+        }
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
     }
+
+    static var windowNumber: Int? { window?.windowNumber }
 }
 
 struct DashboardView: View {
