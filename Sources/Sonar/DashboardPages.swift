@@ -445,14 +445,45 @@ struct DiskPage: View {
     }
 
     @ViewBuilder private func usage(_ m: Monitor, used: Int64) -> some View {
+        let storage = StorageBreakdown.shared
+        let segments = storage.segments(used: used)
         DashCard(title: "Macintosh HD", symbol: "internaldrive", tint: .orange, trailing: "startup disk") {
             BigValue(value: Fmt.storage(m.diskFree), caption: "available")
-            UsageBar(fraction: m.diskTotal > 0 ? Double(used) / Double(m.diskTotal) : 0, color: .orange)
+            if segments.isEmpty {
+                UsageBar(fraction: m.diskTotal > 0 ? Double(used) / Double(m.diskTotal) : 0, color: .orange)
+            } else {
+                // Like System Settings → General → Storage, drawn like the Memory page's breakdown.
+                GeometryReader { g in
+                    HStack(spacing: 2) {
+                        ForEach(segments, id: \.0) { c, size in
+                            Rectangle().fill(c.color).frame(width: max(0, g.size.width * Double(size) / Double(m.diskTotal) - 2))
+                                .help("\(c.title): \(Fmt.storage(size))")
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .frame(width: g.size.width, alignment: .leading)
+                    .background(.primary.opacity(0.07))
+                    .clipShape(Capsule())
+                }
+                .frame(height: 14)
+            }
             LazyVGrid(columns: two, spacing: 0) {
+                ForEach(segments, id: \.0) { c, size in keyValue(c.title, Fmt.storage(size), dot: c.color) }
                 keyValue("Used", Fmt.storage(used))
                 keyValue("Capacity", Fmt.storage(m.diskTotal))
             }
+            HStack(spacing: 6) {
+                if storage.calculating {
+                    ProgressView().controlSize(.mini)
+                    Text(segments.isEmpty ? "Calculating what's using space…" : "Recalculating…")
+                } else if let updated = storage.updated {
+                    Text("Calculated \(updated.formatted(.relative(presentation: .named)))")
+                    Button("Recalculate") { storage.recalculate() }.buttonStyle(.link)
+                }
+            }
+            .font(.caption).foregroundStyle(.secondary)
         }
+        .onAppear { storage.refreshIfStale() }
         DashCard(title: "Activity", symbol: "arrow.up.arrow.down", tint: .orange, trailing: "all disks") {
             HStack(spacing: 24) {
                 BigValue(value: Fmt.rate(m.diskRead), caption: "Read", dot: .orange)
