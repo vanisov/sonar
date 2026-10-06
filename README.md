@@ -70,7 +70,7 @@ cd sonar
 
 `docs/hero.png` comes from the real app: `docs/make-hero.swift` places a `--snapshot` of the panel on a desktop scene (see the comment at its top).
 
-the app icon is drawn in code: edit `Icon/make-icon.swift` and run it to regenerate `Icon/Sonar.icns`. the "sonar" wordmark is traced from the Unbounded typeface by `Icon/make-wordmark.swift`, so the app ships a small shape instead of a font file.
+the app icon is drawn in code: edit `icon/make-icon.swift` and run it to regenerate `icon/Sonar.icns`. the "sonar" wordmark is traced from the Unbounded typeface by `icon/make-wordmark.swift`, so the app ships a small shape instead of a font file.
 
 `./perf.sh` checks the running app against its idle budget (CPU, memory, wake-ups). open and close the panel, dashboard and Settings once first, then run it with everything closed.
 

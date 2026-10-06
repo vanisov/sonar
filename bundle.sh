@@ -14,7 +14,7 @@ swift build -c release
 APP=build/Sonar.app
 rm -rf build && mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/Sonar "$APP/Contents/MacOS/Sonar"
-cp Icon/Sonar.icns "$APP/Contents/Resources/Sonar.icns"
+cp icon/Sonar.icns "$APP/Contents/Resources/Sonar.icns"
 cp CHANGELOG.md "$APP/Contents/Resources/CHANGELOG.md"  # shown in Settings → About
 
 cat > "$APP/Contents/Info.plist" <<EOF
