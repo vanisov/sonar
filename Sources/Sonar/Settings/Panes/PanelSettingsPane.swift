@@ -29,13 +29,13 @@ struct PanelSettingsPane: View {
                 .frame(height: CGFloat(order.count) * 34)
             }
             Section {
-                Picker("Top apps", selection: $topApps) {
+                Picker("Apps listed", selection: $topApps) {
                     Text("3").tag(3)
                     Text("5").tag(5)
                     Text("10").tag(10)
                 }
                 .pickerStyle(.segmented)
-                Picker("Sparkline length", selection: $sparkline) {
+                Picker("Graph length", selection: $sparkline) {
                     Text("1 min").tag(30)
                     Text("2 min").tag(60)
                     Text("5 min").tag(150)

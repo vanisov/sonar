@@ -12,7 +12,7 @@ struct SonarApp: App {
         Updater.shared.startAutomaticChecks()
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count {
-            snapshot(to: args[i + 1])
+            snapshot(to: args[i + 1], seconds: i + 2 < args.count ? Int(args[i + 2]) ?? 5 : 5, clear: args.contains("--clear"))
         }
         #if DEBUG  // README screenshots only; --snapshot above stays in releases for bug reports
             if let i = args.firstIndex(of: "--snapshot-dashboard"), i + 1 < args.count {
@@ -61,11 +61,7 @@ struct SonarApp: App {
                     .background(Color(white: 0.13))
                     .environment(\.colorScheme, .dark))
                 renderer.scale = 2
-                if let tiff = renderer.nsImage?.tiffRepresentation,
-                    let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
-                {
-                    try? png.write(to: URL(fileURLWithPath: path))
-                }
+                Self.writePNG(renderer, to: path)
                 exit(0)
             }
         }
@@ -84,24 +80,38 @@ struct SonarApp: App {
         }
     #endif
 
-    /// Debug aid: `Sonar --snapshot panel.png` renders the popover after a few samples and quits.
-    private func snapshot(to path: String) {
+    /// Writes a rendered view as an 8-bit sRGB PNG. On an HDR display the renderer produces a BT.2100 PQ image,
+    /// which looks washed out once saved, so it's redrawn into sRGB first.
+    private static func writePNG<V: View>(_ renderer: ImageRenderer<V>, to path: String) {
+        guard let image = renderer.cgImage, let srgb = CGColorSpace(name: CGColorSpace.sRGB),
+            let ctx = CGContext(
+                data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0, space: srgb,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return }
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        guard let converted = ctx.makeImage(), let png = NSBitmapImageRep(cgImage: converted).representation(using: .png, properties: [:])
+        else { return }
+        try? png.write(to: URL(fileURLWithPath: path))
+    }
+
+    /// Debug aid: `Sonar --snapshot panel.png [seconds] [--clear]` renders the panel after collecting that many
+    /// seconds of samples (5 by default), prints the sensor readings, and quits. `--clear` leaves out the background,
+    /// for placing the panel on a desktop image.
+    private func snapshot(to path: String, seconds: Int, clear: Bool) {
         let monitor = monitor
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(5))
+            monitor.viewAppeared()  // sample everything the panel shows, as when it's open
+            try? await Task.sleep(for: .seconds(seconds))
             let renderer = ImageRenderer(
-                content: PanelContent(monitor: monitor)
-                    .background(Color(white: 0.13))
+                content: PanelContent(monitor: monitor, interactive: false)
+                    .background(clear ? Color.clear : Color(white: 0.13))
                     .environment(\.colorScheme, .dark))
             renderer.scale = 2
-            if let tiff = renderer.nsImage?.tiffRepresentation,
-                let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
-            {
-                try? png.write(to: URL(fileURLWithPath: path))
-            }
+            Self.writePNG(renderer, to: path)
             print("sensors:", monitor.sensors.map { "\($0.id)=\(Int($0.value))" }.joined(separator: " "))
             print(
-                "fans:", monitor.fanRPMs, "gpu:", monitor.gpu, "apps:", monitor.apps.count, "cpuTemp:", monitor.cpuTemp ?? 0, "gpuTemp:",
+                "cpu:", Int(monitor.cpu.rounded()), "fans:", monitor.fanRPMs, "gpu:", monitor.gpu, "apps:", monitor.apps.count, "cpuTemp:",
+                monitor.cpuTemp ?? 0, "gpuTemp:",
                 monitor.gpuTemp ?? 0)
             exit(0)
         }
