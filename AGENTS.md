@@ -11,7 +11,7 @@ Folders are by feature; each file holds one main type named after the file (see 
 | `App/SonarApp.swift` | App entry, `--snapshot` and `--open-dashboard` debug flags |
 | `App/Updater.swift` | Opt-in update check and install from GitHub releases |
 | `MenuBar/` | Menu bar items, their settings (`MenuBarConfig`), and the cached label image |
-| `Panel/` | The menu bar panel (`PanelView` → `PanelContent`) and its cards |
+| `Panel/` | The menu bar panel (`PanelView` → `PanelContent`): graph and stat cards, `ColumnGraph` (Sonar's column graph style) |
 | `Dashboard/` | Window, navigation, sidebar and search; `Pages/` (one per section), `Charts/` (time-range charts), `Components/` (cards, bars, page layout) |
 | `Processes/` | Processes page: table, control bar, Quit/End actions |
 | `Disk/CleanUp/` | Disk page's Clean Up tab: finds safe-to-remove files and moves picks to the Trash |
@@ -26,6 +26,7 @@ Folders are by feature; each file holds one main type named after the file (see 
 | `Icon/make-icon.swift` | Draws the app icon and builds `Icon/Sonar.icns` |
 | `bundle.sh` | Builds `Sonar.app` / `Sonar.zip`; `install` copies to /Applications |
 | `perf.sh` | Checks the running app against its idle budget |
+| `docs/make-hero.swift` | Builds the README hero image from a real `--snapshot` of the panel |
 
 All paths above are under `Sources/Sonar/` unless they start with another top-level folder.
 

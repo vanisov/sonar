@@ -2,7 +2,7 @@ import SwiftUI
 
 /// A card in the panel. Order and visibility are stored as "cpu,gpu,-memory,…" where "-" means hidden.
 enum PanelCard: String, CaseIterable, Identifiable {
-    case cpu, gpu, memory, disk, network, fans, apps
+    case cpu, gpu, memory, network, disk, fans, apps  // disk and fans next to each other, so they share a row
 
     static let defaults = allCases.map(\.rawValue).joined(separator: ",")
     var id: Self { self }
@@ -15,7 +15,7 @@ enum PanelCard: String, CaseIterable, Identifiable {
         case .disk: "Disk"
         case .network: "Network"
         case .fans: "Fans"
-        case .apps: "Top apps"
+        case .apps: "Using the most"
         }
     }
 
@@ -42,6 +42,9 @@ enum PanelCard: String, CaseIterable, Identifiable {
         case .apps: .indigo
         }
     }
+
+    /// Disk and fans are half-width and pair up; the rest take a full row.
+    var isCompact: Bool { self == .disk || self == .fans }
 
     var section: DashboardSection {
         switch self {
