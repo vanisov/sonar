@@ -58,7 +58,7 @@ to update, turn on **Settings → About → Automatically check for updates**, o
 
 ## build from source
 
-needs Xcode (for SwiftUI's macros) and macOS 14 or later.
+needs Xcode 26 (for SwiftUI's macros) and macOS 14 or later. if `xcode-select -p` prints `CommandLineTools`, see [CONTRIBUTING.md](CONTRIBUTING.md#setup) first.
 
 ```bash
 git clone https://github.com/vanisov/sonar
