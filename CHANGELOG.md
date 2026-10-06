@@ -8,6 +8,22 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-05
+
+### Changed
+- A new panel design, Sonar's own:
+  - CPU, GPU, memory and network are full-width column graphs, drawn like the app icon, with the newest column in
+    orange.
+  - CPU and GPU show their temperature as a dashed line on the same graph, mark the 2-minute peak, and draw a line
+    at 80%. Hover a graph to see the exact time and value.
+  - Network shows download above the line and upload below, on a log scale.
+  - Disk and fans sit side by side with a short caption, and the apps using the most are listed underneath.
+  - Dashboard, Settings and Quit are small round buttons next to your Mac's name, replacing the footer.
+- Settings → Panel: "Sparkline length" is now "Graph length" and "Top apps" is "Apps listed".
+
+### Fixed
+- `--snapshot` images were washed out on HDR displays.
+
 ## [1.6.1] - 2026-10-02
 
 ### Fixed
@@ -142,7 +158,8 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 - Choice of stats in the menu bar, and launch at login.
 - Dashboard with an hour of history, every temperature sensor, and all running apps.
 
-[Unreleased]: https://github.com/vanisov/sonar/compare/v1.6.1...HEAD
+[Unreleased]: https://github.com/vanisov/sonar/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/vanisov/sonar/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/vanisov/sonar/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/vanisov/sonar/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/vanisov/sonar/compare/v1.4.1...v1.5.0
