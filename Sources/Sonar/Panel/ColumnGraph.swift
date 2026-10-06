@@ -155,7 +155,11 @@ private struct GraphTooltip: View {
         Text(text)
             .font(.system(size: 10.5, weight: .semibold)).monospacedDigit()
             .padding(.horizontal, 6).padding(.vertical, 2)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            // Solid on purpose: a material here adds a visual-effect view inside the panel's own, which changed how
+            // the whole panel blended with the desktop while the pointer was over a graph.
+            .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Color.gray.opacity(0.3), lineWidth: 0.5))
+            .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
             .fixedSize()
             .allowsHitTesting(false)
     }
