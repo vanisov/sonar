@@ -25,13 +25,38 @@ swift run              # run from source
 ## Before you open a PR
 
 ```bash
-xcrun swift-format format --in-place --recursive Sources
-xcrun swift-format lint --strict --recursive Sources
+xcrun swift-format format --in-place --recursive Sources Tests
+xcrun swift-format lint --strict --recursive Sources Tests
+swift test
 swift build -c release
 ./perf.sh               # with Sonar.app running and the panel closed
 ```
 
-CI runs the lint and the build on every PR.
+CI runs the lint, the tests and the build on every PR.
+
+## Project layout
+
+Code is grouped by feature, one main type per file, named after the type, like most Swift apps:
+
+```
+Sources/Sonar/
+  App/          entry point, updater
+  MenuBar/      menu bar label and its items
+  Panel/        the menu bar panel
+  Dashboard/    window, sidebar, search; Pages/, Charts/, Components/
+  Processes/    the Processes page
+  Disk/         CleanUp/ and Storage/ (what's using space)
+  Settings/     the Settings window; Panes/ holds one <Name>SettingsPane per tab
+  Monitoring/   Monitor (all sampling) and the values it produces
+  System/       low-level readers: SMC, sysctl, Mac model, battery, network interfaces
+  Hotkeys/      global shortcuts and their recorder
+  Shared/       prefs keys, formatting, brand, small shared views
+Tests/SonarTests/   unit tests for pure logic, mirroring the folders above
+```
+
+- Extensions that add a feature to a type live in `Type+Feature.swift` (e.g. `Monitor+Processes.swift`).
+- Small helpers used by one file can stay in that file as `private`. Default to `private` until something else needs it.
+- Add a test for logic that doesn't need a window: math, parsing, formatting, file scanning.
 
 ## Pull requests
 

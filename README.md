@@ -20,14 +20,14 @@
 ---
 
 <p align="center">
-  <img src="docs/popover.png" alt="Sonar's menu bar panel showing CPU, GPU, memory, disk, network, fans and top apps" width="300" />
-  &nbsp;
-  <img src="docs/dashboard.png" alt="Sonar's dashboard: sidebar with every metric, paired usage and temperature charts, and a time range picker" width="560" />
+  <img src="docs/hero.png" alt="Sonar's panel open under its menu bar item: column graphs for CPU and GPU with temperature, memory and network, disk and fans, and the apps using the most" width="640" />
 </p>
 <p align="center">
-  <img src="docs/processes.png" alt="Sonar's Processes page: All, Applications and Background tabs, a control bar with Quit, Force Quit, Show in Finder and Info, and a sortable process table" width="430" />
+  <img src="docs/dashboard.png" alt="Sonar's dashboard: sidebar with every metric, paired usage and temperature charts, and a time range picker" width="290" />
   &nbsp;
-  <img src="docs/cleanup.png" alt="Sonar's Disk page, Clean Up tab: app caches, logs, package manager caches and Xcode build data with their sizes, and a Move to Trash button" width="430" />
+  <img src="docs/processes.png" alt="Sonar's Processes page: All, Applications and Background tabs, a control bar with Quit, Force Quit, Show in Finder and Info, and a sortable process table" width="290" />
+  &nbsp;
+  <img src="docs/cleanup.png" alt="Sonar's Disk page, Clean Up tab: app caches, logs, package manager caches and Xcode build data with their sizes, and a Move to Trash button" width="290" />
 </p>
 
 **your mac, at a glance.** a tiny, native menu bar monitor for Apple silicon.
@@ -36,7 +36,7 @@
 
 ## features
 
-- **everything in one glance** — CPU, GPU, memory, disk, network, fans and your hungriest apps, in one panel that feels like it shipped with macOS.
+- **everything in one glance** — CPU, GPU, memory and network as column graphs you can read at a glance, with temperature drawn right on the CPU and GPU graphs, the recent peak marked, and the exact value at any moment on hover. disk, fans and the apps using the most sit underneath.
 - **a real dashboard** — a page for every metric with charts over 1 minute to 1 hour, min / average / max, every CPU core, where your memory goes, what your storage is used by (in the same categories as System Settings), disk activity, network interfaces, fans, and an About-this-Mac page with battery health. search it all with ⌘F.
 - **real temperatures** — CPU and GPU temperatures straight from the SMC, in °C or °F, averaged or hottest-core. sensors are discovered per chip at launch instead of hard-coded tables (developed on an M4 Pro, reports from other chips welcome).
 - **your menu bar, your way** — pick any mix of CPU %, temperatures, memory, network and fan speed, reorder them, show icons or values, and have them turn orange or red when something needs attention.
@@ -67,6 +67,8 @@ cd sonar
 ```
 
 `./bundle.sh` on its own builds `build/Sonar.app` and `build/Sonar.zip` without installing. for quick iteration, `swift run` or open `Package.swift` in Xcode.
+
+`docs/hero.png` comes from the real app: `docs/make-hero.swift` places a `--snapshot` of the panel on a desktop scene (see the comment at its top).
 
 the app icon is drawn in code: edit `Icon/make-icon.swift` and run it to regenerate `Icon/Sonar.icns`. the "sonar" wordmark is traced from the Unbounded typeface by `Icon/make-wordmark.swift`, so the app ships a small shape instead of a font file.
 
