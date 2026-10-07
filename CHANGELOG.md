@@ -22,11 +22,6 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 - Settings → Panel: "Sparkline length" is now "Graph length" and "Top apps" is "Apps listed".
 
 ### Fixed
-- `--snapshot` images were washed out on HDR displays.
-
-## [1.6.1] - 2026-10-02
-
-### Fixed
 - Network and disk charts no longer spike to absurd values when a drive is ejected, a dock or adapter is
   unplugged, or a reading fails.
 - Disk read and write rates were up to 5× too high while the panel and dashboard were closed.
@@ -38,6 +33,7 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
   version of Sonar from GitHub, GitHub rate limits get a clear message, and the app relaunches reliably.
 - The Network and This Mac pages no longer re-read interfaces and battery info on every update.
 - VoiceOver reads the panel's Settings and Quit buttons by name.
+- `--snapshot` images were washed out on HDR displays.
 
 ## [1.6.0] - 2026-10-01
 
@@ -159,8 +155,7 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 - Dashboard with an hour of history, every temperature sensor, and all running apps.
 
 [Unreleased]: https://github.com/vanisov/sonar/compare/v1.7.0...HEAD
-[1.7.0]: https://github.com/vanisov/sonar/compare/v1.6.1...v1.7.0
-[1.6.1]: https://github.com/vanisov/sonar/compare/v1.6.0...v1.6.1
+[1.7.0]: https://github.com/vanisov/sonar/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/vanisov/sonar/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/vanisov/sonar/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/vanisov/sonar/compare/v1.4.0...v1.4.1

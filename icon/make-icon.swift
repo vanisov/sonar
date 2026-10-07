@@ -1,7 +1,7 @@
 #!/usr/bin/env swift
 
-// Renders the app icon and builds Icon/Sonar.icns.
-// Run: ./Icon/make-icon.swift   (needs Xcode's toolchain: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer)
+// Renders the app icon and builds icon/Sonar.icns.
+// Run: ./icon/make-icon.swift   (needs Xcode's toolchain: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer)
 import AppKit
 import SwiftUI
 
@@ -9,7 +9,7 @@ let ink = Color(red: 0.082, green: 0.090, blue: 0.110)  // #15171C
 let signal = Color(red: 1.0, green: 0.357, blue: 0.180)  // #FF5B2E
 
 /// The Levels mark: three readings as rounded bars, the one that needs attention in signal orange.
-/// Geometry is in a 236-unit tile (same as the brand board); Sources/Sonar/Shared/Brand/AppMark.swift draws the same mark.
+/// Geometry is in a 236-unit tile (same as the brand board); Sources/Sonar/shared/brand/AppMark.swift draws the same mark.
 struct Levels: View {
     var body: some View {
         GeometryReader { g in
@@ -67,4 +67,4 @@ iconutil.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
 iconutil.arguments = ["-c", "icns", iconset.path, "-o", dir.appendingPathComponent("Sonar.icns").path]
 try! iconutil.run()
 iconutil.waitUntilExit()
-print(iconutil.terminationStatus == 0 ? "Wrote Icon/Sonar.icns" : "iconutil failed")
+print(iconutil.terminationStatus == 0 ? "Wrote icon/Sonar.icns" : "iconutil failed")

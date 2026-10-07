@@ -50,17 +50,17 @@ Code is grouped by feature, one main type per file, named after the type, like m
 
 ```
 Sources/Sonar/
-  App/          entry point, updater
-  MenuBar/      menu bar label and its items
-  Panel/        the menu bar panel
-  Dashboard/    window, sidebar, search; Pages/, Charts/, Components/
-  Processes/    the Processes page
-  Disk/         CleanUp/ and Storage/ (what's using space)
-  Settings/     the Settings window; Panes/ holds one <Name>SettingsPane per tab
-  Monitoring/   Monitor (all sampling) and the values it produces
-  System/       low-level readers: SMC, sysctl, Mac model, battery, network interfaces
-  Hotkeys/      global shortcuts and their recorder
-  Shared/       prefs keys, formatting, brand, small shared views
+  app/          entry point, updater
+  menubar/      menu bar label and its items
+  panel/        the menu bar panel
+  dashboard/    window, sidebar, search; pages/, charts/, components/
+  processes/    the Processes page
+  disk/         cleanup/ and storage/ (what's using space)
+  settings/     the Settings window; panes/ holds one <Name>SettingsPane per tab
+  monitoring/   Monitor (all sampling) and the values it produces
+  system/       low-level readers: SMC, sysctl, Mac model, battery, network interfaces
+  hotkeys/      global shortcuts and their recorder
+  shared/       prefs keys, formatting, brand, small shared views
 Tests/SonarTests/   unit tests for pure logic, mirroring the folders above
 ```
 
