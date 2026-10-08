@@ -12,7 +12,7 @@ Folders are by feature; each file holds one main type named after the file (see 
 | `app/Updater.swift` | Opt-in update check and install from GitHub releases |
 | `menubar/` | Menu bar items, their settings (`MenuBarConfig`), and the cached label image |
 | `panel/` | The menu bar panel (`PanelView` → `PanelContent`): graph and stat cards, `ColumnGraph` (Sonar's column graph style) |
-| `dashboard/` | Window, navigation, sidebar and search; `pages/` (one per section), `charts/` (time-range charts), `components/` (cards, bars, page layout) |
+| `dashboard/` | Window, navigation, sidebar and search; `pages/` (one per section), `charts/` (`HistoryChart`: time-range column graphs drawn with Canvas), `components/` (cards, bars, page layout) |
 | `processes/` | Processes page: table, control bar, Quit/End actions |
 | `disk/cleanup/` | Disk page's Clean Up tab: finds safe-to-remove files and moves picks to the Trash |
 | `disk/storage/` | What's using the startup disk, in System Settings' categories, and System Data's parts |
