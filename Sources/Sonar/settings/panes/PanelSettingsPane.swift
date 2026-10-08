@@ -3,7 +3,7 @@ import SwiftUI
 struct PanelSettingsPane: View {
     @AppStorage(Prefs.panelCards) private var cardsRaw = PanelCard.defaults
     @AppStorage(Prefs.panelTopApps) private var topApps = 5
-    @AppStorage(Prefs.panelSparkline) private var sparkline = 60
+    @AppStorage(Prefs.panelGraphLength) private var sparkline = 60
     @AppStorage(Prefs.panelCardClick) private var cardOpens = true
 
     var body: some View {

@@ -94,7 +94,12 @@ struct OverviewPage: View {
 
     private func usage(_ values: Ring<Float>, _ color: Color, temp: Ring<Float>) -> [ChartSeries] {
         var series = [ChartSeries(name: "Usage", values: values, color: color)]
-        if overlay { series.append(ChartSeries(name: "Temperature", values: temp, color: .orange, dashed: true, scale: tempScale)) }
+        if overlay {
+            series.append(
+                ChartSeries(
+                    name: "Temperature", values: temp, color: .temperature, dashed: true, scale: tempScale,
+                    format: { TemperatureUnit.format($0) }))
+        }
         return series
     }
 
