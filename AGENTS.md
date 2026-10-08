@@ -43,5 +43,7 @@ All paths above are under `Sources/Sonar/` unless they start with another top-le
 - Verify UI changes by running the app and looking at it, not only by building.
 - Format and lint with `swift-format`, and run `swift test`, before committing (see CONTRIBUTING.md).
 - Commit messages and PR titles follow Conventional Commits 1.0.0 (see CONTRIBUTING.md).
+- Never add the signing certificate, a .p12, or its password to the repo, and don't change how `bundle.sh` or
+  `release.yml` sign without reading docs/RELEASING.md → Code signing: the updater rejects anything else.
 - Don't push tags or create releases by hand: merging a PR with a new `## [X.Y.Z]` changelog section releases it
   (see [docs/RELEASING.md](docs/RELEASING.md)). Never merge your own PRs.

@@ -1,4 +1,5 @@
 import AppKit
+import Security
 
 /// Checks GitHub Releases for a newer Sonar and can install it in place. Off unless the user turns it on;
 /// this is the only network request Sonar makes.
@@ -122,6 +123,11 @@ import AppKit
                 status = .failed("The download wasn't a valid Sonar.app.")
                 return
             }
+            // And signed with the same certificate as this copy, so a release uploaded by anyone else is refused.
+            guard Self.isSigned(newApp, likeCodeAt: appURL) else {
+                status = .failed("The download isn't signed by Sonar, so it wasn't installed.")
+                return
+            }
             _ = try FileManager.default.replaceItemAt(appURL, withItemAt: newApp)
             let relaunch = Process()
             relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
@@ -134,6 +140,24 @@ import AppKit
         } catch {
             status = .failed("Couldn't install the update: \(error.localizedDescription)")
         }
+    }
+
+    /// Whether `candidate` satisfies the designated requirement of the app at `reference`: same bundle identifier and
+    /// signed with the same certificate. A reference without a certificate (an ad-hoc build from source) has nothing
+    /// to compare against, so any valid signature passes; releases are always signed with the certificate.
+    nonisolated static func isSigned(_ candidate: URL, likeCodeAt reference: URL) -> Bool {
+        var referenceCode: SecStaticCode?, candidateCode: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(reference as CFURL, [], &referenceCode) == errSecSuccess, let referenceCode,
+            SecStaticCodeCreateWithPath(candidate as CFURL, [], &candidateCode) == errSecSuccess, let candidateCode
+        else { return false }
+        let strict = SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate)
+        var info: CFDictionary?
+        SecCodeCopySigningInformation(referenceCode, SecCSFlags(rawValue: kSecCSSigningInformation), &info)
+        let certificates = (info as? [String: Any])?[kSecCodeInfoCertificates as String] as? [SecCertificate] ?? []
+        guard !certificates.isEmpty else { return SecStaticCodeCheckValidity(candidateCode, strict, nil) == errSecSuccess }
+        var requirement: SecRequirement?
+        guard SecCodeCopyDesignatedRequirement(referenceCode, [], &requirement) == errSecSuccess, let requirement else { return false }
+        return SecStaticCodeCheckValidity(candidateCode, strict, requirement) == errSecSuccess
     }
 
     /// Semantic versions: "1.10.0" > "1.9.2", and a prerelease is older than its release: "1.5.0-beta.1" < "1.5.0".

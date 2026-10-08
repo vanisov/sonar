@@ -15,6 +15,7 @@ Include what you found, how to reproduce it, and which version you tested. Expec
 
 Sonar runs without admin rights and makes one network request: the opt-in update check. The parts that matter most:
 
-- **The updater:** downloading, verifying, and replacing the app.
+- **The updater:** downloading, verifying, and replacing the app. Releases are signed with Sonar's certificate, and
+  the updater only installs downloads signed with it (see [docs/RELEASING.md](docs/RELEASING.md#code-signing)).
 - **Ending processes:** Quit, Force Quit, End and Force End on the Processes page.
 - **Clean Up:** anything that could move files outside the folders it lists, or files the user didn't pick.

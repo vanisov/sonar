@@ -36,7 +36,11 @@ cat > "$APP/Contents/Info.plist" <<EOF
 </plist>
 EOF
 
-codesign --force --sign - "$APP"
+# Releases are signed with Sonar's certificate so macOS keeps permissions across updates and the updater can tell
+# a genuine update from anything else. Without it (contributors, PR builds), sign ad hoc.
+SIGN_IDENTITY="${SIGN_IDENTITY:-$(security find-identity -p codesigning 2>/dev/null | grep -q '"Sonar Code Signing"' && echo "Sonar Code Signing" || echo -)}"
+codesign --force --sign "$SIGN_IDENTITY" "$APP"
+echo "Signed with: $([ "$SIGN_IDENTITY" = - ] && echo "ad hoc" || echo "$SIGN_IDENTITY")"
 ditto -c -k --keepParent "$APP" build/Sonar.zip
 echo "Built $APP and build/Sonar.zip"
 

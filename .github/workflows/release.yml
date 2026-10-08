@@ -53,8 +53,36 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Import the signing certificate
+        env:
+          P12: ${{ secrets.SIGNING_CERT_P12 }}
+          P12_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+        run: |
+          if [ -z "$P12" ]; then
+            echo "::error::The SIGNING_CERT_P12 secret is missing. Releases must be signed with Sonar's certificate."
+            exit 1
+          fi
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          security import "$RUNNER_TEMP/signing.p12" -k "$KEYCHAIN" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/signing.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+
       - name: Build
-        run: DEVELOPER_DIR="$(xcode-select -p)" ./bundle.sh
+        run: DEVELOPER_DIR="$(xcode-select -p)" SIGN_IDENTITY="Sonar Code Signing" ./bundle.sh
+
+      - name: Check the signature
+        run: |
+          # The updater only accepts builds signed with this certificate, so a release signed with anything else
+          # would strand every user.
+          codesign --verify --strict build/Sonar.app
+          codesign -d -r- build/Sonar.app 2>&1 | grep -q 'certificate root = H"483718b76021632ea75199da242e0a047fad2a9b"' \
+            || { echo "::error::Sonar.app isn't signed with Sonar's certificate."; exit 1; }
 
       - name: Release notes from CHANGELOG.md
         run: |

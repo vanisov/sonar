@@ -8,6 +8,17 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-08
+
+### Changed
+- Sonar is now signed with its own certificate instead of ad hoc, so macOS remembers the permissions you
+  grant (like access to Desktop, Documents and Downloads for the storage breakdown) across updates. This update
+  asks one last time.
+
+### Security
+- The updater installs a download only if it's signed with Sonar's certificate. A release uploaded by anyone
+  else, even with access to the GitHub repository, is refused.
+
 ## [1.8.0] - 2026-10-08
 
 ### Changed
@@ -165,7 +176,8 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 - Choice of stats in the menu bar, and launch at login.
 - Dashboard with an hour of history, every temperature sensor, and all running apps.
 
-[Unreleased]: https://github.com/vanisov/sonar/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/vanisov/sonar/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/vanisov/sonar/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/vanisov/sonar/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/vanisov/sonar/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/vanisov/sonar/compare/v1.5.0...v1.6.0
