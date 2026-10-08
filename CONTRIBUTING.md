@@ -21,6 +21,9 @@ xcode-select -p        # should print /Applications/Xcode.app/Contents/Developer
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer   # if it prints CommandLineTools
 ```
 
+Builds you make are signed ad hoc; releases are signed with Sonar's certificate, which only the maintainer has
+(see [docs/RELEASING.md](docs/RELEASING.md#code-signing)).
+
 If you'd rather not switch, prefix commands with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
 Otherwise `swift build` fails with "plugin for module 'SwiftUIMacros' not found". `bundle.sh` handles this itself.
 

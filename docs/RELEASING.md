@@ -45,3 +45,35 @@ the same workflow rebuilds and republishes it.
 - `./perf.sh` stays within budget with the panel closed (after opening and closing the panel and dashboard once).
 - The panel, settings, and dashboard open and close cleanly.
 - New user-facing behavior is in the changelog.
+
+## Code signing
+
+Releases are signed with Sonar's own certificate, **Sonar Code Signing**. It's self-signed, so it's free, but
+it never changes between builds. That stable identity does two jobs:
+
+- **Permissions stick.** macOS remembers the folders people let Sonar read (Desktop, Documents, Downloads) by
+  the app's signature. Ad-hoc builds get a new identity every time, so every update asked again.
+- **Updates are verified.** The updater installs a download only if it's signed with the same certificate as
+  the running app. A release uploaded by anyone else, even with a stolen GitHub token, is refused.
+
+| | |
+|---|---|
+| Certificate root hash (what macOS and the updater check) | `483718b76021632ea75199da242e0a047fad2a9b` |
+| SHA-256 fingerprint | `1BDB4AF199051C64889FD92BED21FD92ACE24959B02823595946A47034991369` |
+| Expires | October 2036 |
+| CI secrets | `SIGNING_CERT_P12` (the .p12, base64) and `SIGNING_CERT_PASSWORD` |
+| Maintainer's copy | login keychain, plus a backup of the .p12 and its password in a password manager |
+
+The release workflow imports it into a temporary keychain, signs with it, and refuses to publish if
+`build/Sonar.app` isn't signed with it. `bundle.sh` uses it automatically when it's in your keychain and signs ad
+hoc otherwise, so contributors don't need it.
+
+**Never commit the certificate or its password.** Whoever has both can sign Sonar updates.
+
+### If the certificate is lost, leaked or about to expire
+
+Make a new one the same way (a self-signed code-signing certificate named "Sonar Code Signing"), update both
+secrets, and update the root hash in `release.yml` and in the table above. The updater in existing installs
+will refuse releases signed with the new certificate, so tell users in the release notes to download that one
+release by hand. Every release after it updates normally again. If the old key leaked, do this right away.
+
