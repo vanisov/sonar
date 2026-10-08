@@ -18,14 +18,13 @@ enum Prefs {
     // Panel
     static let panelCards = "panelCards"  // enabled cards in order, comma-separated
     static let panelTopApps = "panelTopApps"
-    static let panelSparkline = "panelSparklineSamples"
+    static let panelGraphLength = "panelSparklineSamples"  // key kept from when it was "Sparkline length"
     static let panelCardClick = "panelCardOpensDashboard"
 
     // Dashboard
     static let dashboardOpenTo = "dashboardOpenTo"  // "last" or a section id
     static let dashboardLastSection = "dashboardLastSection"
     static let dashboardRange = "dashboardRange"  // seconds
-    static let chartFilled = "chartFilled"
     static let overlayTemperature = "overlayTemperature"
     static let cpuTempSource = "cpuTempHottest"  // false = average
 

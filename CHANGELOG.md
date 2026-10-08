@@ -8,6 +8,17 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-10-08
+
+### Changed
+- The dashboard uses the panel's column graphs on every page: one column per slice of time holding that slice's
+  peak, the newest column in orange, temperature as a dashed line on the CPU and GPU graphs, and an 80% line on
+  percentage graphs. Network and disk activity show download and read above the line, upload and write below.
+- Hover any dashboard graph to read the exact time and values.
+- Sensors show their recent history as small column graphs.
+- Removed the chart style setting (filled or line), since graphs are now columns.
+- Dashboard graphs no longer use Swift Charts, which was one of the costliest parts of the app to draw.
+
 ## [1.7.0] - 2026-10-05
 
 ### Changed
@@ -154,7 +165,8 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 - Choice of stats in the menu bar, and launch at login.
 - Dashboard with an hour of history, every temperature sensor, and all running apps.
 
-[Unreleased]: https://github.com/vanisov/sonar/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/vanisov/sonar/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/vanisov/sonar/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/vanisov/sonar/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/vanisov/sonar/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/vanisov/sonar/compare/v1.4.1...v1.5.0

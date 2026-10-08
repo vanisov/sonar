@@ -14,7 +14,8 @@ struct SensorsPage: View {
                                 Text("\(group) \(i + 1)")
                                 Text(sensor.id).font(.caption.monospaced()).foregroundStyle(.tertiary)
                                 Spacer()
-                                Sparkline(values: sensor.history, tint: .orange, maxValue: nil, window: 150).frame(width: 140, height: 20)
+                                ColumnGraph(values: sensor.history, tint: .orange, window: 150, columns: 25, top: nil).frame(
+                                    width: 140, height: 20)
                                 Text(TemperatureUnit.format(sensor.value, decimals: 1)).monospacedDigit().frame(
                                     width: 76, alignment: .trailing)
                             }

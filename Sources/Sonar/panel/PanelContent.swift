@@ -8,7 +8,7 @@ struct PanelContent: View {
     var interactive = true  // false for snapshots: offscreen, buttons render as inactive
     @AppStorage(Prefs.panelCards) private var cardsRaw = PanelCard.defaults
     @AppStorage(Prefs.panelTopApps) private var topApps = 5
-    @AppStorage(Prefs.panelSparkline) private var window = 60
+    @AppStorage(Prefs.panelGraphLength) private var window = 60
     @AppStorage(Prefs.panelCardClick) private var cardOpens = true
     @AppStorage(TemperatureUnit.storageKey) private var unit = TemperatureUnit.system.rawValue
     @AppStorage(Prefs.storageBinary) private var binary = false
