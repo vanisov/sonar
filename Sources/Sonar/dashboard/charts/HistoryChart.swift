@@ -114,7 +114,7 @@ struct HistoryChart: View {
                 let opacity = c == newest || c == hovered ? 1 : 0.3 + 0.5 * Double(c) / Double(data.count)
                 let rect = scale.column(peak, below: s == 1, x: plot.minX + CGFloat(c) * step + (step - width) / 2, width: width, in: plot)
                 ctx.fill(
-                    Path(roundedRect: rect, cornerRadius: min(2.5, width / 2)), with: .color(c == newest ? .signal : color.opacity(opacity))
+                    Path(roundedRect: rect, cornerRadius: min(2.5, width / 2)), with: .color(color.opacity(opacity))
                 )
             }
         }
