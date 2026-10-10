@@ -229,7 +229,9 @@ final class Monitor {
         gpuTempHistory.append(Float(gpuTemp ?? 0))
 
         if watched || slowTick || menuBar.contains("fan") {
-            fanRPMs = fanKeys.map { smc?.read($0.actual) ?? 0 }  // keep positions: fanRPMs[i] is fan i
+            // fanRPMs[i] is fan i. A read that fails keeps that fan's last speed: counting it as 0 showed a spinning
+            // fan as "stopped" and drew a false zero into its history.
+            fanRPMs = fanKeys.enumerated().map { i, key in smc?.read(key.actual) ?? (i < fanRPMs.count ? fanRPMs[i] : 0) }
             fansAuto = fanKeys.allSatisfy { smc?.read($0.mode) != 1 }  // 0 = auto, 3 = stopped by macOS at idle, 1 = forced
         }
         for i in fanHistories.indices { fanHistories[i].append(Float(i < fanRPMs.count ? fanRPMs[i] : 0)) }

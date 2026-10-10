@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Sonar's graph style: rounded columns that brighten toward now, with the newest column in signal orange (the same
-/// shape as the app icon). Each column is the peak of its slice of history, so a short spike is never averaged away.
+/// Sonar's graph style: rounded columns that brighten toward now, the newest at full strength (the same shape as
+/// the app icon). Each column is the peak of its slice of history, so a short spike is never averaged away.
 /// Drawn with Canvas and only redrawn when a sample arrives or the pointer moves; nothing animates.
 struct ColumnGraph: View {
     let values: Ring<Float>
@@ -36,7 +36,7 @@ struct ColumnGraph: View {
                     let height = max(2.5, CGFloat(min(peak / scale, 1)) * (h - 2))
                     let rect = CGRect(x: layout.x(c), y: h - height, width: layout.width, height: height)
                     let newest = c == columns - 1
-                    let shading = newest ? Color.signal : tint.opacity(c == hovered ? 0.95 : 0.3 + 0.5 * Double(c) / Double(columns))
+                    let shading = tint.opacity(newest || c == hovered ? 1 : 0.3 + 0.5 * Double(c) / Double(columns))
                     ctx.fill(Path(roundedRect: rect, cornerRadius: min(2.2, layout.width / 2)), with: .color(shading))
                 }
                 if let overlay {
@@ -97,10 +97,10 @@ struct MirrorColumnGraph: View {
                     let radius = min(1.6, layout.width / 2)
                     ctx.fill(
                         Path(roundedRect: CGRect(x: layout.x(c), y: axis - dh, width: layout.width, height: dh), cornerRadius: radius),
-                        with: .color(newest ? .signal : Color.green.opacity(opacity)))
+                        with: .color(Color.green.opacity(opacity)))
                     ctx.fill(
                         Path(roundedRect: CGRect(x: layout.x(c), y: axis + 1, width: layout.width, height: uh), cornerRadius: radius),
-                        with: .color(newest ? .signal.opacity(0.85) : Color.teal.opacity(opacity * 0.85)))
+                        with: .color(Color.teal.opacity(opacity * 0.85)))
                 }
             }
             .overlay(alignment: .topLeading) {
