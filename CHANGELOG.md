@@ -14,6 +14,17 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 - Sonar is now signed with its own certificate instead of ad hoc, so macOS remembers the permissions you
   grant (like access to Desktop, Documents and Downloads for the storage breakdown) across updates. This update
   asks one last time.
+- The newest column in every graph is no longer orange; columns simply brighten toward now. The orange dot still
+  marks the peak.
+
+### Added
+- Hover the "Where memory goes" bar on the Memory page, or the storage bar on the Disk page, to see what each part is,
+  its size and share. App memory lists the apps using the most, and System Data its biggest parts. Hovering a row in
+  the list below highlights its part of the bar.
+
+### Fixed
+- A fan whose speed reading failed for a moment showed as "0 RPM · stopped" and drew a false zero into its graph.
+  It now keeps its last speed.
 
 ### Security
 - The updater installs a download only if it's signed with Sonar's certificate. A release uploaded by anyone
@@ -23,7 +34,7 @@ See [docs/RELEASING.md](docs/RELEASING.md) for how versions are chosen and shipp
 
 ### Changed
 - The dashboard uses the panel's column graphs on every page: one column per slice of time holding that slice's
-  peak, the newest column in orange, temperature as a dashed line on the CPU and GPU graphs, and an 80% line on
+  peak, brightest toward now, temperature as a dashed line on the CPU and GPU graphs, and an 80% line on
   percentage graphs. Network and disk activity show download and read above the line, upload and write below.
 - Hover any dashboard graph to read the exact time and values.
 - Sensors show their recent history as small column graphs.
