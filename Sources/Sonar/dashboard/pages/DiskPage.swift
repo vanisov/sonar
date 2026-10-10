@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DiskPage: View {
     let monitor: Monitor
+    @State private var highlighted: String?
     @Bindable private var nav = DashboardNavigation.shared
 
     var body: some View {
@@ -48,22 +49,16 @@ struct DiskPage: View {
                 UsageBar(fraction: m.diskTotal > 0 ? Double(used) / Double(m.diskTotal) : 0, color: .orange)
             } else {
                 // Like System Settings → General → Storage, drawn like the Memory page's breakdown.
-                GeometryReader { g in
-                    HStack(spacing: 2) {
-                        ForEach(segments, id: \.0) { c, size in
-                            Rectangle().fill(c.color).frame(width: max(0, g.size.width * Double(size) / Double(max(m.diskTotal, 1)) - 2))
-                                .help("\(c.title): \(Fmt.storage(size))")
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .frame(width: g.size.width, alignment: .leading)
-                    .background(.primary.opacity(0.07))
-                    .clipShape(Capsule())
-                }
-                .frame(height: 14)
+                SegmentBar(
+                    segments: segments.map { c, size in
+                        SegmentBar.Segment(id: c.title, value: Double(size), color: c.color, details: storageDetails(c, used: used))
+                    },
+                    total: Double(m.diskTotal), format: { Fmt.storage(Int64($0)) }, highlighted: $highlighted)
             }
             LazyVGrid(columns: two, spacing: 0) {
-                ForEach(segments, id: \.0) { c, size in keyValue(c.title, Fmt.storage(size), dot: c.color) }
+                ForEach(segments, id: \.0) { c, size in
+                    keyValue(c.title, Fmt.storage(size), dot: c.color).highlights(c.title, in: $highlighted)
+                }
             }
             HStack(spacing: 6) {
                 if storage.calculating {
@@ -117,6 +112,22 @@ struct DiskPage: View {
                     ChartSeries(name: "Write", values: m.diskWriteHistory, color: .blue),
                 ],
                 height: 210, axis: { Fmt.rate($0) })
+        }
+    }
+
+    /// What's behind each category, for its hover readout: System Data's biggest parts, or what's measured.
+    private func storageDetails(_ category: StorageCategory, used: Int64) -> [String] {
+        switch category {
+        case .systemData:
+            StorageBreakdown.shared.systemBreakdown(used: used).prefix(4).map { part, size in
+                "\(part?.title ?? "Snapshots and other")  \(Fmt.storage(size))"
+            }
+        case .documents: ["Every visible folder in your home that isn't another category"]
+        case .applications: ["/Applications and ~/Applications"]
+        case .macOS: ["The sealed system volume"]
+        case .iCloud: ["Files downloaded to this Mac"]
+        case .developer: ["Simulators, DerivedData and device support in ~/Library/Developer"]
+        default: []
         }
     }
 }
